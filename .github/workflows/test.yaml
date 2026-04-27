@@ -35,7 +35,7 @@ jobs:
 
       - name: Install OpenCL (Windows)
         if: runner.os == 'Windows'
-        run: vcpkg install opencl
+        run: winget install Khronos.OpenCL-SDK
         continue-on-error: true
 
       - name: Run tests
