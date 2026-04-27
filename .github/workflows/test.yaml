@@ -35,7 +35,7 @@ jobs:
 
       - name: Install OpenCL (Windows)
         if: runner.os == 'Windows'
-        run: winget install Khronos.OpenCL-SDK
+        run: winget install Khronos.OpenCL-SDK --accept-source-agreement
         continue-on-error: true
 
       - name: Run tests
