@@ -35,7 +35,7 @@ jobs:
 
       - name: Install OpenCL (Windows)
         if: runner.os == 'Windows'
-        run: choco install opencl-intel-cpu-runtime -y
+        run: vcpkg install opencl
         continue-on-error: true
 
       - name: Run tests
