@@ -5,4 +5,6 @@ NB_MODULE(_core, m) {
   m.doc() = "OpenCL backend untuk PyTorch, API mirip torch.cuda";
   m.def("is_available", &is_available,
         "Kembalika True jika minimal ada satu GPU OpenCL yang tersedia.");
+  m.def("device_count", &device_count,
+        "Kembalikan jumlah GPU OpenCL yang tersedia.");
 }

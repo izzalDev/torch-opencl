@@ -33,3 +33,16 @@ def test_consistent():
     first = torch_opencl.is_available()
     second = torch_opencl.is_available()
     assert first == second
+
+
+def test_device_count_type():
+    assert isinstance(torch_opencl.device_count(), int)
+
+
+def test_device_count_non_negative():
+    assert torch_opencl.device_count() >= 0
+
+
+def test_device_count_matches_availability():
+    """Jika is_available() True, device_count() harus >= 1, dan sebaliknya."""
+    assert torch_opencl.is_available() == (torch_opencl.device_count() > 0)
