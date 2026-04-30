@@ -13,12 +13,7 @@ dependencies = [
 ]
 
 [tool.scikit-build]
-minimum-version = "build-system.requires"
 build-dir = "build"
-
-[tool.scikit-build-core-conan]
-build = "missing"
-output-folder = "build"
 
 [tool.uv]
 cache-keys = [{ file = "pyproject.toml" }, { file = "csrc/**/*.{h,c,hpp,cpp}" }, { file = "CMakeLists.txt" }]
@@ -34,12 +29,11 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [build-system]
-requires = ["scikit-build-core>=0.12", "nanobind>=2.12.0", "torch>=2.11", "scikit-build-core-conan>=0.9.2"]
+requires = ["torch>=2.11", "scikit-build-core-conan>=0.9.2"]
 build-backend = "scikit_build_core_conan.build"
 
 [dependency-groups]
 dev = [
-    "nanobind>=2.12.0",
     "pyopencl>=2026.1.2",
     "pytest>=9.0",
     "scikit-build-core-conan>=0.9.2",

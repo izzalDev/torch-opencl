@@ -21,11 +21,11 @@ public:
   static OpenCLContext &instance();
   bool is_available() const;
   int device_count() const;
-  std::string device_name(int index);
+  const std::string device_name(int index);
   OpenCLDevice &get(int index);
   const OpenCLDevice &get(int index) const;
   OpenCLContext(const OpenCLContext &) = delete;
-  OpenCLDevice &operator=(const OpenCLContext &) = delete;
+  OpenCLContext &operator=(const OpenCLContext &) = delete;
   void set_device(int index);
   int current_device() const;
 

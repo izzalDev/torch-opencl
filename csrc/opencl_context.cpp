@@ -63,7 +63,7 @@ int OpenCLContext::device_count() const {
   return static_cast<int>(devices_.size());
 }
 
-std::string OpenCLContext::device_name(int index) {
+const std::string OpenCLContext::device_name(int index) {
   check_index(index);
   return devices_[index].name;
 }
