@@ -9,10 +9,12 @@ find_package(Torch CONFIG REQUIRED)
 find_package(OpenCLICDLoader REQUIRED)
 find_package(OpenCLHeadersCpp REQUIRED)
 find_package(OpenCLHeaders REQUIRED)
+find_package(fmt REQUIRED)
 
 nanobind_add_module(_core
 				csrc/binding.cpp
 				csrc/_core.cpp
+				csrc/opencl_context.cpp
 )
 
 target_compile_features(_core PRIVATE cxx_std_17)
@@ -31,6 +33,7 @@ target_include_directories(_core PRIVATE
 target_link_libraries(_core PRIVATE
 				${TORCH_LIBRARIES}
 				OpenCL::HeadersCpp
+				fmt::fmt
 )
 
 if(APPLE)

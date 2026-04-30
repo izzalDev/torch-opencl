@@ -1,42 +1,31 @@
 #include "_core.h"
-#include <CL/opencl.hpp>
-#include <vector>
+
+#include "opencl_context.h"
 
 bool is_available() {
-  try {
-    std::vector<cl::Platform> platforms;
-    cl::Platform::get(&platforms);
-
-    for (auto &platform : platforms) {
-      std::vector<cl::Device> devices;
-      platform.getDevices(CL_DEVICE_TYPE_GPU, &devices);
-
-      if (!devices.empty()) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch (...) {
-    return false;
-  }
+  return OpenCLContext::instance().is_available();
 }
 
 int device_count() {
-  try {
-    std::vector<cl::Platform> platforms;
-    cl::Platform::get(&platforms);
+  return OpenCLContext::instance().device_count();
+}
 
-    int count = 0;
+std::string device_name(int index) {
+  return OpenCLContext::instance().device_name(index);
+}
 
-    for (auto &platform : platforms) {
-      std::vector<cl::Device> devices;
-      platform.getDevices(CL_DEVICE_TYPE_GPU, &devices);
-      count += static_cast<int>(devices.size());
-    }
+int current_device() {
+  return OpenCLContext::instance().current_device();
+}
 
-    return count;
-  } catch (...) {
-    return 0;
-  }
+void set_device(int index) {
+  OpenCLContext::instance().set_device(index);
+}
+
+const OpenCLDevice &get_device_properties(int index) {
+  return OpenCLContext::instance().get(index);
+}
+
+void synchronize(int index) {
+  OpenCLContext::instance().get(index).queue.finish();
 }

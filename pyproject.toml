@@ -16,6 +16,10 @@ dependencies = [
 minimum-version = "build-system.requires"
 build-dir = "build"
 
+[tool.scikit-build-core-conan]
+build = "missing"
+output-folder = "build"
+
 [tool.uv]
 cache-keys = [{ file = "pyproject.toml" }, { file = "csrc/**/*.{h,c,hpp,cpp}" }, { file = "CMakeLists.txt" }]
 

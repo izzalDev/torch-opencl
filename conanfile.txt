@@ -2,6 +2,7 @@
 opencl-headers/2023.12.14
 opencl-clhpp-headers/2023.12.14
 opencl-icd-loader/2023.12.14
+fmt/12.1.0
 
 [generators]
 CMakeToolchain
