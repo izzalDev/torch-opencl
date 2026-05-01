@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
@@ -16,8 +18,6 @@ nanobind_add_module(_core
 				csrc/_core.cpp
 				csrc/opencl_context.cpp
 )
-
-target_compile_features(_core PRIVATE cxx_std_17)
 
 target_compile_definitions(_core PRIVATE
 				CL_TARGET_OPENCL_VERSION=120
