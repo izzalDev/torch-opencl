@@ -22,23 +22,5 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
 
-      - name: Install OpenCL (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y opencl-headers ocl-icd-opencl-dev
-
-      - name: Cache vcpkg packages (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg\installed
-          key: vcpkg-${{ runner.os }}-opencl
-
-      - name: Install OpenCL (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          vcpkg install opencl
-          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
-          echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
-
       - name: Run tests
         run: uv run pytest -v

@@ -1,0 +1,11 @@
+[requires]
+opencl-headers/2023.12.14
+opencl-clhpp-headers/2023.12.14
+opencl-icd-loader/2023.12.14
+
+[generators]
+CMakeToolchain
+CMakeDeps
+
+[layout]
+cmake_layout

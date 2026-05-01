@@ -3,12 +3,10 @@ project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include(FetchContent)
-
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(nanobind CONFIG REQUIRED)
 find_package(Torch CONFIG REQUIRED)
-find_package(OpenCL REQUIRED)
+find_package(OpenCLICDLoader REQUIRED)
 find_package(OpenCLHeadersCpp REQUIRED)
 find_package(OpenCLHeaders REQUIRED)
 
@@ -18,6 +16,13 @@ nanobind_add_module(_core
 )
 
 target_compile_features(_core PRIVATE cxx_std_17)
+
+target_compile_definitions(_core PRIVATE
+				CL_TARGET_OPENCL_VERSION=120
+				CL_HPP_TARGET_OPENCL_VERSION=120
+				CL_HPP_MINIMUM_OPENCL_VERSION=120
+				CL_HPP_ENABLE_EXCEPTIONS
+)
 
 target_include_directories(_core PRIVATE
 				csrc/include
