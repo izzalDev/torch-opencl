@@ -15,7 +15,7 @@ std::string device_name(int index) {
 }
 
 int current_device() {
-  return OpenCLContext::instance().current_device();
+  return OpenCLContext::instance().current_device().index;
 }
 
 void set_device(int index) {
@@ -23,9 +23,9 @@ void set_device(int index) {
 }
 
 const OpenCLDevice &get_device_properties(int index) {
-  return OpenCLContext::instance().get(index);
+  return OpenCLContext::instance().current_device();
 }
 
 void synchronize(int index) {
-  OpenCLContext::instance().get(index).queue.finish();
+  OpenCLContext::instance().current_device().queue.finish();
 }

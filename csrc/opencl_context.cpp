@@ -33,6 +33,7 @@ OpenCLContext::OpenCLContext() {
         OpenCLDevice d;
         std::string version = dev.getInfo<CL_DEVICE_VERSION>();
         std::sscanf(version.c_str(), "OpenCL %d.%d", &d.major, &d.minor);
+        d.index = static_cast<int>(devices_.size());
         d.name = dev.getInfo<CL_DEVICE_NAME>();
         d.total_memory = dev.getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
         d.compute_units = dev.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>();
@@ -68,21 +69,15 @@ const std::string OpenCLContext::device_name(int index) {
   return devices_[index].name;
 }
 
-OpenCLDevice &OpenCLContext::get(int index) {
-  check_index(index);
-  return devices_[index];
-}
-
-const OpenCLDevice &OpenCLContext::get(int index) const {
-  check_index(index);
-  return devices_[index];
-}
-
 void OpenCLContext::set_device(int index) {
   check_index(index);
   current_device_index_ = index;
 }
 
-int OpenCLContext::current_device() const {
-  return current_device_index_;
+OpenCLDevice& OpenCLContext::current_device(){
+  return devices_[current_device_index_];
+}
+
+const OpenCLDevice OpenCLContext::current_device() const {
+  return devices_[current_device_index_];
 }

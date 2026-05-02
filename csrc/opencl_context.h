@@ -8,6 +8,7 @@ struct OpenCLDevice {
   cl::Context context;
   cl::CommandQueue queue;
 
+  int index;
   std::string name;
   cl_ulong total_memory;
   cl_uint compute_units;
@@ -22,12 +23,11 @@ public:
   bool is_available() const;
   int device_count() const;
   const std::string device_name(int index);
-  OpenCLDevice &get(int index);
-  const OpenCLDevice &get(int index) const;
   OpenCLContext(const OpenCLContext &) = delete;
   OpenCLContext &operator=(const OpenCLContext &) = delete;
   void set_device(int index);
-  int current_device() const;
+  OpenCLDevice &current_device();
+  const OpenCLDevice current_device() const;
 
 private:
   OpenCLContext();
