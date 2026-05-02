@@ -13,53 +13,50 @@ find_package(OpenCLHeadersCpp REQUIRED)
 find_package(OpenCLHeaders REQUIRED)
 find_package(fmt REQUIRED)
 
-nanobind_add_module(_core
-				csrc/binding.cpp
-				csrc/_core.cpp
-				csrc/opencl_context.cpp
-				csrc/opencl_allocator.cpp
-				csrc/opencl_hooks.cpp
-				csrc/opencl_ops.cpp
+file(GLOB_RECURSE SOURCE_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/csrc/*.cpp"
+)
+nanobind_add_module(_C ${SOURCE_FILES})
+
+target_compile_definitions(_C PRIVATE
+    CL_TARGET_OPENCL_VERSION=120
+    CL_HPP_TARGET_OPENCL_VERSION=120
+    CL_HPP_MINIMUM_OPENCL_VERSION=120
+    CL_HPP_ENABLE_EXCEPTIONS
 )
 
-target_compile_definitions(_core PRIVATE
-				CL_TARGET_OPENCL_VERSION=120
-				CL_HPP_TARGET_OPENCL_VERSION=120
-				CL_HPP_MINIMUM_OPENCL_VERSION=120
-				CL_HPP_ENABLE_EXCEPTIONS
+target_include_directories(_C PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_include_directories(_core PRIVATE
-				csrc/include
-)
-
-target_link_libraries(_core PRIVATE
-				${TORCH_LIBRARIES}
-				OpenCL::HeadersCpp
-				fmt::fmt
+target_link_libraries(_C PRIVATE
+    ${TORCH_LIBRARIES}
+    OpenCL::HeadersCpp
+    fmt::fmt
 )
 
 if(APPLE)
-	target_link_libraries(_core PRIVATE "-framework OpenCL")
+    target_link_libraries(_C PRIVATE "-framework OpenCL")
 else()
-	target_link_libraries(_core PRIVATE OpenCL::OpenCL)
+    target_link_libraries(_C PRIVATE OpenCL::OpenCL)
 endif()
 
 nanobind_add_stub(
-				_core_stub
-				MODULE _core
-				OUTPUT _core.pyi
-				PYTHON_PATH $<TARGET_FILE_DIR:_core>
-				DEPENDS _core
-				MARKER_FILE py.typed
+    _C_stub
+    MODULE _C
+    OUTPUT _C.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:_C>
+    DEPENDS _C
+    MARKER_FILE py.typed
 )
 
-install(TARGETS _core
-				DESTINATION ${SKBUILD_PROJECT_NAME}
+install(TARGETS _C
+    DESTINATION ${SKBUILD_PROJECT_NAME}
 )
 
 install(FILES
-				${CMAKE_CURRENT_BINARY_DIR}/_core.pyi
-				${CMAKE_CURRENT_BINARY_DIR}/py.typed
-				DESTINATION ${SKBUILD_PROJECT_NAME}
+    ${CMAKE_CURRENT_BINARY_DIR}/_C.pyi
+    ${CMAKE_CURRENT_BINARY_DIR}/py.typed
+    DESTINATION ${SKBUILD_PROJECT_NAME}
 )
