@@ -17,6 +17,9 @@ nanobind_add_module(_core
 				csrc/binding.cpp
 				csrc/_core.cpp
 				csrc/opencl_context.cpp
+				csrc/opencl_allocator.cpp
+				csrc/opencl_hooks.cpp
+				csrc/opencl_ops.cpp
 )
 
 target_compile_definitions(_core PRIVATE

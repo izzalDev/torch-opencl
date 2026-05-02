@@ -1,4 +1,5 @@
 #include "_core.h"
+#include "opencl_hooks.h"
 #include <fmt/format.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
@@ -6,6 +7,8 @@
 namespace nb = nanobind;
 
 NB_MODULE(_core, m) {
+	register_opencl_backend();
+
   nb::class_<OpenCLDevice>(m, "OpenCLDeviceProperties")
       .def_ro("name", &OpenCLDevice::name)
       .def_ro("total_memory", &OpenCLDevice::total_memory)

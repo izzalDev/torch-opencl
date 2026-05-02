@@ -21,6 +21,7 @@ cache-keys = [
 	{ file = "CMakeLists.txt" },
 	{ file = "conanfile.txt" },
 ]
+no-build-isolation-package = ["torch-opencl"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]

@@ -67,18 +67,20 @@ c10::DeleterFnPtr OpenCLAllocator::raw_deleter() const {
 void OpenCLAllocator::copy_data(void *dest, const void *src,
                                 std::size_t count) const {
   auto &dev = OpenCLContext::instance().current_device();
-
-  // Cari objek asli dari pointer dest dan src
   auto *src_buf = get_cl_buffer(src);
-  auto *dest_buf = get_cl_buffer(dest);
+  auto *dst_buf = get_cl_buffer(dest);
 
-  if (!src_buf || !dest_buf) {
-    throw std::runtime_error("copy_data: pointer nggak dikenal sama OpenCL");
-  }
+  if (src_buf && dst_buf)
+    // device→device
+    dev.queue.enqueueCopyBuffer(*src_buf, *dst_buf, 0, 0, count);
+  else if (src_buf && !dst_buf)
+    // device→host
+    dev.queue.enqueueReadBuffer(*src_buf, CL_TRUE, 0, count, dest);
+  else if (!src_buf && dst_buf)
+    // host→device
+    dev.queue.enqueueWriteBuffer(*dst_buf, CL_TRUE, 0, count, src);
+  else
+    std::memcpy(dest, src, count);
 
-  // Suruh GPU copy datanya
-  dev.queue.enqueueCopyBuffer(*src_buf, *dest_buf, 0, 0, count);
-
-  // Tunggu sampai copy selesai (synchronous)
   dev.queue.finish();
 }
