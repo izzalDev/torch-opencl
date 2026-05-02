@@ -5,7 +5,6 @@
 #include <c10/util/irange.h>
 #include <fmt/core.h>
 
-#include <limits>
 #include <vector>
 
 namespace c10::opencl {
@@ -63,7 +62,7 @@ void doInitOpenCLDevices() {
     DeviceContext d;
     d.device = dev;
     d.context = std::move(ctx);
-    d.default_queue = std::move(queue);
+    d.queue = std::move(queue);
     g_devices.push_back(d);
   }
 }
@@ -121,10 +120,10 @@ const cl::Device &get_device(DeviceIndex device) {
   return g_devices[device].device;
 }
 
-const cl::CommandQueue &get_default_queue(DeviceIndex device) {
+const cl::CommandQueue &get_queue(DeviceIndex device) {
   initOpenCLDevices();
   check_device_index(device);
-  return g_devices[device].default_queue;
+  return g_devices[device].queue;
 }
 
 void check_device_index(DeviceIndex device) {
