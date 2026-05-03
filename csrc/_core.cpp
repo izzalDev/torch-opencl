@@ -6,6 +6,7 @@
 #endif // __APPLE__
 #include <vector>
 
+namespace torch_opencl {
 bool is_available() {
   cl_uint num_platforms = 0;
   cl_int err = clGetPlatformIDs(0, nullptr, &num_platforms);
@@ -27,3 +28,4 @@ bool is_available() {
 
   return false;
 }
+} // namespace torch_opencl
