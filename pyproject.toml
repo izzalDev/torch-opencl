@@ -27,8 +27,13 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [build-system]
-requires = ["torch>=2.11", "scikit-build-core>=0.12"]
+requires = ["torch>=2.11", "scikit-build-core>=0.12", "nanobind>=2.12"]
 build-backend = "scikit_build_core.build"
 
 [dependency-groups]
-dev = ["pyopencl>=2026.1.2", "pytest>=9.0", "scikit-build-core>=0.12"]
+dev = [
+    "nanobind>=2.12",
+    "pyopencl>=2026.1.2",
+    "pytest>=9.0",
+    "scikit-build-core>=0.12",
+]

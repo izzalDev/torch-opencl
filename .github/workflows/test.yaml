@@ -16,6 +16,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install OpenCL (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          vcpkg install opencl
+          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+          echo "CMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
