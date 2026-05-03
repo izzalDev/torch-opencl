@@ -10,16 +10,11 @@ dependencies = ["numpy<2.4", "torch>=2.11"]
 [tool.scikit-build]
 build-dir = "build"
 
-[tool.scikit-build-core-conan]
-settings-all = ["compiler.cppstd=17"]
-output-dir = "build"
-
 [tool.uv]
 cache-keys = [
 	{ file = "pyproject.toml" },
 	{ file = "csrc/**/*.{h,c,hpp,cpp}" },
 	{ file = "CMakeLists.txt" },
-	{ file = "conanfile.txt" },
 ]
 no-build-isolation-package = ["torch-opencl"]
 
@@ -32,8 +27,8 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [build-system]
-requires = ["torch>=2.11", "scikit-build-core-conan>=0.9.2"]
-build-backend = "scikit_build_core_conan.build"
+requires = ["torch>=2.11", "scikit-build-core>=0.12"]
+build-backend = "scikit_build_core.build"
 
 [dependency-groups]
-dev = ["pyopencl>=2026.1.2", "pytest>=9.0", "scikit-build-core-conan>=0.9.2"]
+dev = ["pyopencl>=2026.1.2", "pytest>=9.0", "scikit-build-core>=0.12"]

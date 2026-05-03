@@ -85,6 +85,9 @@ DeviceIndex device_count() noexcept {
   } catch (const std::exception &e) {
     TORCH_WARN("OpenCL device_count() failed: ", e.what());
     return 0;
+  } catch (...) {
+    TORCH_WARN("OpenCL device_count() failed: unknown error");
+    return 0;
   }
 }
 
