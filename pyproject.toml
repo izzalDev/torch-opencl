@@ -3,14 +3,9 @@ name = "torch-opencl"
 version = "0.1.0"
 description = "A Python extension that integrates PyTorch with OpenCL, enabling GPU acceleration via the OpenCL API."
 readme = "README.md"
-authors = [
-    { name = "izzalDev", email = "rizal.fadlullah@gmail.com" }
-]
+authors = [{ name = "izzalDev", email = "rizal.fadlullah@gmail.com" }]
 requires-python = ">=3.10"
-dependencies = [
-    "numpy<2.4",
-    "torch>=2.11",
-]
+dependencies = ["numpy<2.4", "torch>=2.11"]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
@@ -18,12 +13,14 @@ build-dir = "build"
 wheel.exclude = ["torch_opencl/csrc"]
 
 [tool.uv]
-cache-keys = [{ file = "pyproject.toml" }, { file = "csrc/**/*.{h,c,hpp,cpp}" }, { file = "CMakeLists.txt" }]
+cache-keys = [
+	{ file = "pyproject.toml" },
+	{ file = "csrc/**/*" },
+	{ file = "CMakeLists.txt" },
+]
 
 [tool.uv.sources]
-torch = [
-    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
-]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -36,8 +33,8 @@ build-backend = "scikit_build_core.build"
 
 [dependency-groups]
 dev = [
-    "nanobind>=2.12.0",
-    "pyopencl>=2026.1.2",
-    "pytest>=9.0",
-    "scikit-build-core>=0.12",
+	"nanobind>=2.12.0",
+	"pyopencl>=2026.1.2",
+	"pytest>=9.0",
+	"scikit-build-core>=0.12",
 ]
