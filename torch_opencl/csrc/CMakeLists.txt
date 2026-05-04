@@ -4,7 +4,7 @@ find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
 nanobind_add_module(${LIBRARY_NAME} Module.cpp)
 target_link_libraries(${LIBRARY_NAME} PRIVATE torch_opencl)
-target_link_directories(${LIBRARY_NAME} PRIVATE ${SKBUILD_PROJECT_NAME}/lib)
+target_link_directories(${LIBRARY_NAME} PRIVATE ${SKBUILD_PROJECT_NAME})
 
 set_target_properties(torch_opencl PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:${LIBRARY_NAME}>

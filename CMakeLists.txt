@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(${SKBUILD_PROJECT_NAME} LANGUAGES CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(APPLE)
 	set(CMAKE_INSTALL_RPATH "@loader_path/lib;@loader_path")
