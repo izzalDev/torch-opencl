@@ -9,12 +9,7 @@ if(APPLE)
 	target_link_libraries(${LIBRARY_NAME} PRIVATE "-framework OpenCL")
 else()
 	target_link_libraries(${LIBRARY_NAME} PRIVATE OpenCL::OpenCL)
-	set_target_properties(${LIBRARY_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+	set_target_properties(${LIBRARY_NAME} PROPERTIES 
+		WINDOWS_EXPORT_ALL_SYMBOLS ON 
+	)
 endif()
-
-install(TARGETS ${LIBRARY_NAME} LIBRARY DESTINATION ${SKBUILD_PROJECT_NAME})
-
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
-				DESTINATION ${SKBUILD_PROJECT_NAME}/include
-				FILES_MATCHING PATTERN "*.h"
-)
