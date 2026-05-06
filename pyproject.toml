@@ -10,12 +10,13 @@ dependencies = ["numpy<2.4", "torch>=2.11"]
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build"
-wheel.exclude = ["torch_opencl/csrc"]
+wheel.exclude = ["torch_opencl/csrc"]  # exclude C++ sources
 
 [tool.uv]
 cache-keys = [
 	{ file = "pyproject.toml" },
 	{ file = "csrc/**/*" },
+	{ file = "torch_opencl/csrc/**/*" },
 	{ file = "CMakeLists.txt" },
 ]
 
