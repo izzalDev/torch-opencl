@@ -2,7 +2,6 @@
 
 #include <c10/core/Device.h>
 #include <c10/macros/Macros.h>
-#include <fmt/format.h>
 
 namespace c10::opencl {
 
