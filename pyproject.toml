@@ -10,7 +10,6 @@ dependencies = ["numpy<2.4", "torch>=2.11"]
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build"
-cmake.args = ["-GNinja"]
 wheel.exclude = ["torch_opencl/csrc"]
 
 [tool.uv]
