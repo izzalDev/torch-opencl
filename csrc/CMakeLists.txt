@@ -4,7 +4,7 @@ file(GLOB_RECURSE SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
 
 add_library(${LIBRARY_NAME} SHARED ${SOURCE_FILES})
 target_compile_features(${LIBRARY_NAME} PRIVATE cxx_std_17)
-target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} torch)
+target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(APPLE)
   set(CL_VERSION 120)
@@ -22,7 +22,7 @@ target_compile_definitions(
           CL_TARGET_OPENCL_VERSION=${CL_VERSION}
           CL_HPP_TARGET_OPENCL_VERSION=${CL_VERSION})
 
-target_link_libraries(${LIBRARY_NAME} PRIVATE torch OpenCL::HeadersCpp)
+target_link_libraries(${LIBRARY_NAME} PUBLIC torch PRIVATE OpenCL::HeadersCpp)
 install(
   TARGETS ${LIBRARY_NAME}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
