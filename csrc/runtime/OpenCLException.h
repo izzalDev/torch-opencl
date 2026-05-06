@@ -13,11 +13,12 @@ void clCheckFail(const cl::Error &e, const char *file, uint32_t line,
 
 } // namespace c10::opencl
 
-#define OPENCL_CHECK(EXPR)                                                     \
-  do {                                                                         \
-    try {                                                                      \
-      (EXPR);                                                                  \
-    } catch (const cl::Error &__e) {                                           \
-      clCheckFail(__e, __FILE__, static_cast<uint32_t>(__LINE__), __func__);   \
-    }                                                                          \
-  } while (0)
+#define OPENCL_CHECK(EXPR)                                                    \
+    do {                                                                      \
+        try {                                                                 \
+            (EXPR);                                                           \
+        } catch (const cl::Error &__e) {                                     \
+            ::c10::opencl::clCheckFail(                                      \
+                __e, __FILE__, static_cast<uint32_t>(__LINE__), __func__);   \
+        }                                                                     \
+    } while (0)

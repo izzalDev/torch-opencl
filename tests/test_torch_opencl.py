@@ -1,24 +1,28 @@
-import torch
-import torch_opencl
+"""Tests for torch_opencl package."""
+
 import pyopencl as cl
 import pytest
+import torch
+import torch_opencl
+
 
 def test_device_count():
-    # Get device count from torch-opencl
+    """device_count() should match PyOpenCL's GPU count across all platforms."""
     count = torch_opencl.device_count()
     assert isinstance(count, int)
     assert count >= 0
-    
-    # Get device count from pyopencl for comparison
-    platforms = cl.get_platforms()
-    pyopencl_count = 0
-    for platform in platforms:
-        devices = platform.get_devices(device_type=cl.device_type.GPU)
-        pyopencl_count += len(devices)
-    
-    # Both should match as they both look for GPUs
-    assert count == pyopencl_count
-    print(f"Detected {count} OpenCL GPU device(s)")
 
-def test_import():
+    pyopencl_count = sum(
+        len(platform.get_devices(device_type=cl.device_type.GPU))
+        for platform in cl.get_platforms()
+    )
+    assert count == pyopencl_count, (
+        f"torch_opencl reports {count} devices, "
+        f"but PyOpenCL found {pyopencl_count}"
+    )
+
+
+def test_has_device_count():
+    """torch_opencl must expose device_count at the top-level namespace."""
     assert hasattr(torch_opencl, "device_count")
+    assert callable(torch_opencl.device_count)
