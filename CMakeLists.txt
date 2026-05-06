@@ -31,6 +31,7 @@ cpmaddpackage(
 		"CL_HPP_ENABLE_EXCEPTIONS ON")
 
 find_package(Python COMPONENTS Interpreter Development REQUIRED)
+set(kineto_LIBRARY "NOT_REQUIRED" CACHE STRING "Silence kineto warning")
 find_package(Torch CONFIG REQUIRED)
 find_package(nanobind CONFIG REQUIRED)
 
