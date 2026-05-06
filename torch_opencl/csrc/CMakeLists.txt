@@ -20,9 +20,13 @@ install(TARGETS ${LIBRARY_NAME} DESTINATION ${SKBUILD_PROJECT_NAME})
 
 # nanobind_add_stub needs __init__.py present at install time to import
 # torch_opencl._C. On Windows this also registers PyTorch DLL search paths.
+# We copy all .py files from the package directory, excluding csrc.
 install(
-    FILES ${CMAKE_CURRENT_SOURCE_DIR}/../__init__.py
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../
     DESTINATION ${SKBUILD_PROJECT_NAME}
+    FILES_MATCHING
+    PATTERN "*.py"
+		PATTERN "csrc" EXCLUDE
 )
 
 # Generate _C.pyi type stubs and a py.typed marker (PEP 561) at install time
