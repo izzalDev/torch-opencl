@@ -5,10 +5,13 @@ find_package(
   Python
   COMPONENTS Interpreter Development.Module
   REQUIRED)
+find_library(TORCH_PYTHON_LIBRARY torch_python PATHS ${TORCH_INSTALL_PREFIX}/lib
+                                                     REQUIRED)
 
 # Creates the Python extension module (_C.cpython-*.so/.dylib) via nanobind
 nanobind_add_module(${LIBRARY_NAME} _C.cpp)
-target_link_libraries(${LIBRARY_NAME} PRIVATE torch_opencl)
+target_link_libraries(${LIBRARY_NAME} PRIVATE torch_opencl
+                                              ${TORCH_PYTHON_LIBRARY})
 
 # RPATH so the dynamic linker finds libtorch_opencl at runtime without
 # LD_LIBRARY_PATH / DYLD_LIBRARY_PATH. macOS -> @loader_path (relative to the
