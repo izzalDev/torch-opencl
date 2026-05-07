@@ -1,3 +1,4 @@
+# tests/test_torch_opencl.py
 """Tests for torch_opencl package."""
 
 import pyopencl as cl
@@ -11,9 +12,13 @@ def test_device_count():
     assert isinstance(count, int)
     assert count >= 0
 
-    pyopencl_count = sum(
-        len(platform.get_devices(device_type=cl.device_type.GPU)) for platform in cl.get_platforms()
-    )
+    pyopencl_count = 0
+    for platform in cl.get_platforms():
+        try:
+            pyopencl_count += len(platform.get_devices(device_type=cl.device_type.GPU))
+        except cl.LogicError:
+            continue
+
     assert count == pyopencl_count, (
         f"torch_opencl reports {count} devices, but PyOpenCL found {pyopencl_count}"
     )
