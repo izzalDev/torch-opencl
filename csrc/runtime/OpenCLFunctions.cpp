@@ -1,16 +1,18 @@
 #include "runtime/OpenCLFunctions.h"
-#include "runtime/OpenCLException.h"
 
-#include <CL/opencl.hpp>
 #include <c10/core/Device.h>
 #include <c10/util/CallOnce.h>
+
+#include <CL/opencl.hpp>
 #include <vector>
+
+#include "runtime/OpenCLException.h"
 
 namespace c10::opencl {
 
 struct DeviceContext {
     cl::Device device;
-    cl::Context *context;
+    cl::Context* context;
     cl::CommandQueue queue;
 };
 
@@ -25,14 +27,14 @@ static void initOpenCLDevices() {
     OPENCL_CHECK(cl::Platform::get(&platforms));
     TORCH_CHECK(!platforms.empty(), "No OpenCL platforms found");
 
-    for (auto &platform : platforms) {
+    for (auto& platform : platforms) {
         std::vector<cl::Device> platform_devs;
         OPENCL_CHECK(platform.getDevices(CL_DEVICE_TYPE_GPU, &platform_devs));
 
         g_contexts.emplace_back(platform_devs);
-        cl::Context &ctx = g_contexts.back();
+        cl::Context& ctx = g_contexts.back();
 
-        for (auto &dev : platform_devs) {
+        for (auto& dev : platform_devs) {
             g_devices.push_back({dev, &ctx, cl::CommandQueue(ctx, dev)});
         }
     }
@@ -78,4 +80,4 @@ DeviceIndex ExchangeDevice(DeviceIndex device) {
     return old;
 }
 
-} // namespace c10::opencl
+}  // namespace c10::opencl

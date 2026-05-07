@@ -1,8 +1,7 @@
 """Tests for torch_opencl package."""
 
 import pyopencl as cl
-import pytest
-import torch
+
 import torch_opencl
 
 
@@ -13,12 +12,10 @@ def test_device_count():
     assert count >= 0
 
     pyopencl_count = sum(
-        len(platform.get_devices(device_type=cl.device_type.GPU))
-        for platform in cl.get_platforms()
+        len(platform.get_devices(device_type=cl.device_type.GPU)) for platform in cl.get_platforms()
     )
     assert count == pyopencl_count, (
-        f"torch_opencl reports {count} devices, "
-        f"but PyOpenCL found {pyopencl_count}"
+        f"torch_opencl reports {count} devices, but PyOpenCL found {pyopencl_count}"
     )
 
 
