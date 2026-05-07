@@ -1,9 +1,16 @@
 set(LIBRARY_NAME _C)
 
+# Development.Module: only Python headers needed; no need to link libpython
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
+# Creates the Python extension module (_C.cpython-*.so/.dylib) via nanobind
 nanobind_add_module(${LIBRARY_NAME} _C.cpp)
 target_link_libraries(${LIBRARY_NAME} PRIVATE torch_opencl)
+
+# RPATH so the dynamic linker finds libtorch_opencl at runtime without
+# LD_LIBRARY_PATH / DYLD_LIBRARY_PATH.
+#   macOS -> @loader_path (relative to the .so being loaded)
+#   Linux -> $ORIGIN      (same meaning, different syntax)
 set_target_properties(${LIBRARY_NAME} PROPERTIES
     INSTALL_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,$ORIGIN>"
     BUILD_WITH_INSTALL_RPATH TRUE
@@ -11,14 +18,14 @@ set_target_properties(${LIBRARY_NAME} PROPERTIES
 
 install(TARGETS ${LIBRARY_NAME} DESTINATION ${SKBUILD_PROJECT_NAME})
 
-# import the package during stub generation. On Windows, importing _C requires
-# torch to be imported first (via __init__.py) to register PyTorch DLL paths.
-# scikit-build-core already packages __init__.py into the wheel separately.
+# nanobind_add_stub needs __init__.py present at install time to import
+# torch_opencl._C. On Windows this also registers PyTorch DLL search paths.
 install(
     FILES ${CMAKE_CURRENT_SOURCE_DIR}/../__init__.py
     DESTINATION ${SKBUILD_PROJECT_NAME}
 )
 
+# Generate _C.pyi type stubs and a py.typed marker (PEP 561) at install time
 nanobind_add_stub(
     _C_stub
     INSTALL_TIME
