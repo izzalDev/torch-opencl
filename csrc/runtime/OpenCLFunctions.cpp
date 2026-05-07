@@ -1,9 +1,12 @@
+// csrc/runtime/OpenCLFunctions.cpp
+
 #include "runtime/OpenCLFunctions.h"
 
 #include <c10/core/Device.h>
 #include <c10/util/CallOnce.h>
 
 #include <CL/opencl.hpp>
+#include <memory>
 #include <vector>
 
 #include "runtime/OpenCLException.h"
@@ -12,34 +15,39 @@ namespace c10::opencl {
 
 struct DeviceContext {
     cl::Device device;
-    cl::Context* context;
+    std::shared_ptr<cl::Context> context;
     cl::CommandQueue queue;
 };
 
 static c10::once_flag g_init_flag;
 static std::vector<DeviceContext> g_devices;
-static std::vector<cl::Context> g_contexts;
 
 static thread_local DeviceIndex tl_current_device = 0;
 
 static void initOpenCLDevices() {
     std::vector<cl::Platform> platforms;
-    OPENCL_CHECK(cl::Platform::get(&platforms));
-    TORCH_CHECK(!platforms.empty(), "No OpenCL platforms found");
+    try {
+        cl::Platform::get(&platforms);
+    } catch (const cl::Error&) {
+        return;
+    }
 
     for (auto& platform : platforms) {
         std::vector<cl::Device> platform_devs;
-        OPENCL_CHECK(platform.getDevices(CL_DEVICE_TYPE_GPU, &platform_devs));
+        try {
+            platform.getDevices(CL_DEVICE_TYPE_GPU, &platform_devs);
+        } catch (const cl::Error&) {
+            continue;
+        }
 
-        g_contexts.emplace_back(platform_devs);
-        cl::Context& ctx = g_contexts.back();
+        if (platform_devs.empty()) continue;
+
+        auto ctx = std::make_shared<cl::Context>(platform_devs);
 
         for (auto& dev : platform_devs) {
-            g_devices.push_back({dev, &ctx, cl::CommandQueue(ctx, dev)});
+            g_devices.push_back({dev, ctx, cl::CommandQueue(*ctx, dev)});
         }
     }
-
-    TORCH_CHECK(!g_devices.empty(), "No OpenCL GPU devices found");
 }
 
 static void ensureInitialized() {
@@ -47,7 +55,11 @@ static void ensureInitialized() {
 }
 
 DeviceIndex device_count() noexcept {
-    ensureInitialized();
+    try {
+        ensureInitialized();
+    } catch (...) {
+        return 0;
+    }
     return static_cast<DeviceIndex>(g_devices.size());
 }
 
