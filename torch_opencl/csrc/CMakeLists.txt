@@ -4,6 +4,10 @@ find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 
 nanobind_add_module(${LIBRARY_NAME} _C.cpp)
 target_link_libraries(${LIBRARY_NAME} PRIVATE torch_opencl)
+set_target_properties(${LIBRARY_NAME} PROPERTIES
+    INSTALL_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,$ORIGIN>"
+    BUILD_WITH_INSTALL_RPATH TRUE
+)
 
 install(TARGETS ${LIBRARY_NAME} DESTINATION ${SKBUILD_PROJECT_NAME})
 
