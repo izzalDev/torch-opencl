@@ -13,11 +13,14 @@ def test_device_count():
     assert count >= 0
 
     pyopencl_count = 0
-    for platform in cl.get_platforms():
-        try:
-            pyopencl_count += len(platform.get_devices(device_type=cl.device_type.GPU))
-        except cl.LogicError:
-            continue
+    try:
+        for platform in cl.get_platforms():
+            try:
+                pyopencl_count += len(platform.get_devices(device_type=cl.device_type.GPU))
+            except cl.LogicError:
+                continue
+    except cl.LogicError:
+        pass  # Tidak ada OpenCL platform → pyopencl_count tetap 0
 
     assert count == pyopencl_count, (
         f"torch_opencl reports {count} devices, but PyOpenCL found {pyopencl_count}"
