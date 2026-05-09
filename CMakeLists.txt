@@ -7,6 +7,9 @@ find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(nanobind CONFIG REQUIRED)
 find_package(Torch CONFIG REQUIRED)
 
+find_package(OpenCLHeadersCpp REQUIRED)
+find_package(OpenCLHeaders REQUIRED)
+
 set(MODULE_NAME    _C)
 set(STUB_TARGET    ${MODULE_NAME}_stub)
 set(STUB_FILE      ${MODULE_NAME}.pyi)
@@ -18,9 +21,34 @@ else()
     set(INSTALL_DIR ${SKBUILD_PROJECT_NAME})
 endif()
 
-nanobind_add_module(${MODULE_NAME} csrc/${MODULE_NAME}.cpp)
+if(APPLE)
+    set(CL_VERSION 120)
+    set(OPENCL_LIBS "-framework OpenCL")
+else()
+    set(CL_VERSION 300)
+    find_package(OpenCL REQUIRED)
+    set(OPENCL_LIBS OpenCL::OpenCL)
+endif()
+
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS csrc/*.cpp)
+nanobind_add_module(${MODULE_NAME} ${SOURCES})
+
+target_compile_definitions(${MODULE_NAME} PRIVATE
+    CL_HPP_ENABLE_EXCEPTIONS
+    CL_HPP_MINIMUM_OPENCL_VERSION=120
+    CL_TARGET_OPENCL_VERSION=${CL_VERSION}
+    CL_HPP_TARGET_OPENCL_VERSION=${CL_VERSION}
+)
+
+target_include_directories(${MODULE_NAME} PRIVATE csrc)
 target_compile_features(${MODULE_NAME} PRIVATE cxx_std_17)
-target_link_libraries(${MODULE_NAME} PRIVATE ${TORCH_LIBRARIES})
+
+target_link_libraries(${MODULE_NAME} PRIVATE
+    ${TORCH_LIBRARIES}
+    OpenCL::HeadersCpp
+    OpenCL::Headers
+    ${OPENCL_LIBS}
+)
 
 nanobind_add_stub(
     ${STUB_TARGET}

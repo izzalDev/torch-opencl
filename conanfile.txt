@@ -1,0 +1,7 @@
+[requires]
+opencl-clhpp-headers/2025.07.22
+opencl-headers/2025.07.22
+
+[generators]
+CMakeDeps
+CMakeToolchain
