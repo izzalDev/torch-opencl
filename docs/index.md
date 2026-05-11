@@ -4,21 +4,33 @@ layout: home
 
 hero:
   name: "Torch OpenCL"
-  text: "A VitePress Site"
-  tagline: My great project tagline
+  text: "OpenCL Backend for PyTorch"
+  tagline: "Experimental PyTorch backend using OpenCL and PrivateUse1 integration."
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: Architecture
+      link: /architecture/
+
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: GitHub
+      link: https://github.com/izzalDev/torch-opencl
 
 features:
-  - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: PyTorch Integration
+    details: Integrates OpenCL directly into the PyTorch dispatcher using the PrivateUse1 backend system.
+
+  - title: OpenCL Runtime
+    details: Runtime abstraction layer for OpenCL platforms, devices, contexts, and command queues.
+
+  - title: Tensor Backend
+    details: Supports tensor allocation, tensor transfer, and tensor execution using OpenCL buffers.
+
+  - title: Custom Allocator
+    details: Custom allocator integration between PyTorch storage and OpenCL memory objects.
+
+  - title: Kernel Execution
+    details: Executes OpenCL kernels through the PyTorch dispatcher and backend runtime pipeline.
+
+  - title: Integration Testing
+    details: Backend validation is performed using full integration testing against real runtime execution.
 ---
