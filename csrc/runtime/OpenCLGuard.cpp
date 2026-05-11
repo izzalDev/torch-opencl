@@ -6,4 +6,4 @@ namespace c10::opencl {
 C10_REGISTER_GUARD_IMPL(PrivateUse1, OpenCLGuardImpl);
 // LITERALINCLUDE END: OPENCL GUARD REGISTRATION
 
-}  // namespace c10::opencl
+} // namespace c10::opencl

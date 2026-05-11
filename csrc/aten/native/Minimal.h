@@ -1,11 +1,14 @@
 #include <ATen/core/TensorBody.h>
 namespace at::native::opencl {
 
-at::Tensor empty_memory_format(c10::IntArrayRef size, std::optional<c10::ScalarType> dtype_opt,
-                               std::optional<c10::Layout> layout_opt,
-                               std::optional<c10::Device> device_opt,
-                               std::optional<bool> pin_memory_opt,
-                               std::optional<c10::MemoryFormat> memory_format_opt);
+at::Tensor empty_memory_format(
+    c10::IntArrayRef size,
+    std::optional<c10::ScalarType> dtype_opt,
+    std::optional<c10::Layout> layout_opt,
+    std::optional<c10::Device> device_opt,
+    std::optional<bool> pin_memory_opt,
+    std::optional<c10::MemoryFormat> memory_format_opt
+);
 
 // at::Tensor empty_strided(c10::IntArrayRef size, c10::IntArrayRef stride,
 //                          std::optional<c10::ScalarType> dtype_opt,
@@ -41,4 +44,4 @@ at::Tensor empty_memory_format(c10::IntArrayRef size, std::optional<c10::ScalarT
 //
 // void cpu_fallback(const c10::OperatorHandle &op, torch::jit::Stack *stack);
 //
-}  // namespace at::native::opencl
+} // namespace at::native::opencl

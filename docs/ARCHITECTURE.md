@@ -22,7 +22,6 @@ PyTorch Dispatcher
 Setelah `rename_privateuse1_backend("opencl")` dipanggil, PyTorch mengenal
 `torch.device("opencl")` dan meroute semua operasi ke implementasi kita.
 
-
 ## Alur: `tensor.to("opencl")`
 
 Ini adalah alur paling fundamental. Memahami ini berarti memahami seluruh backend.
@@ -59,7 +58,6 @@ PyTorch dispatcher → aten::_copy_from (PrivateUse1)
   - D2D: queue.enqueueCopyBuffer(src_buffer, dst_buffer)
 ```
 
-
 ## Komponen C++
 
 ### `runtime/OpenCLFunctions` — Inti Runtime
@@ -84,7 +82,6 @@ struct DeviceContext {
 **Thread-local device index**: `tl_current_device` adalah thread-local, sehingga
 setiap thread Python punya "current device" sendiri — konsisten dengan perilaku CUDA.
 
-
 ### `runtime/OpenCLDeviceAllocator` — Manajemen Memori
 
 Kunci desain: cara PyTorch mengakses memori GPU kita:
@@ -105,7 +102,6 @@ cl::Buffer& buf = entry->buffer;
 untuk memastikan cleanup yang benar. `Delete` callback dipanggil PyTorch saat
 storage tidak lagi dibutuhkan.
 
-
 ### `aten/OpenCLEmptyOps` — Alokasi Tensor
 
 **Wajib ada.** PyTorch memanggil `empty_strided` setiap kali perlu membuat
@@ -118,7 +114,6 @@ allocator->allocate(nbytes)            // → cl::Buffer di GPU
 → make_tensor<TensorImpl>(storage)     // buat TensorImpl
 → set_sizes_and_strides(size, stride)  // terapkan shape
 ```
-
 
 ### `aten/OpenCLCopyOps` — Transfer Data
 
@@ -134,7 +129,6 @@ Tiga jalur transfer, semua sinkron (`CL_TRUE`):
 Transfer sinkron dipilih untuk kesederhanaan. Async membutuhkan manajemen
 event/fence yang kompleks — kandidat optimasi di masa depan.
 
-
 ### `runtime/OpenCLGuard` — Device Context Switching
 
 Mengimplementasikan `DeviceGuardImplInterface` PyTorch. Dipakai PyTorch secara
@@ -144,13 +138,11 @@ internal untuk memastikan operasi dijalankan di device yang benar.
 C10_REGISTER_GUARD_IMPL(PrivateUse1, OpenCLGuardImpl);
 ```
 
-
 ### `runtime/OpenCLHooks` — Integrasi Level Tinggi
 
 `PrivateUse1HooksInterface` adalah antarmuka yang PyTorch gunakan untuk
 bertanya tentang kemampuan device kita: `isAvailable()`, `deviceCount()`,
 `getDeviceFromPtr()`, dll. Registrasi via static initializer saat `.so` di-load.
-
 
 ## Komponen Python
 
@@ -165,7 +157,6 @@ generate_methods_for_privateuse1_backend(...)    # 3. Generate .opencl() di Tens
 ```
 
 Setelah ini, `tensor.opencl()`, `tensor.is_opencl`, dll. tersedia secara otomatis.
-
 
 ## Aliran Registrasi (saat `import torch_opencl`)
 
@@ -188,7 +179,6 @@ Setelah selesai:
   ✓ tensor.opencl() / tensor.is_opencl tersedia
 ```
 
-
 ## Operator yang Diimplementasikan
 
 | Operator                      | File                 | Keterangan               |
@@ -198,7 +188,6 @@ Setelah selesai:
 | `aten::_copy_from_and_resize` | `OpenCLCopyOps.cpp`  | Delegasi ke `_copy_from` |
 
 Semua operator komputasi (add, matmul, dll.) belum diimplementasikan.
-
 
 ## Menambahkan Operator Baru
 
@@ -225,7 +214,6 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse1, m) {
 
 File baru di `csrc/` otomatis diambil CMake via `GLOB_RECURSE` —
 tidak perlu edit `CMakeLists.txt`.
-
 
 ## Keterbatasan Saat Ini
 

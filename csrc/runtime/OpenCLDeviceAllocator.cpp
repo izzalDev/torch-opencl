@@ -15,7 +15,7 @@ namespace {
 
 void deleteHandle(void *ptr) { delete static_cast<OpenCLBufferHandle *>(ptr); }
 
-}  // namespace
+} // namespace
 
 // ─────────────────────────────────────────────
 // allocate()
@@ -31,22 +31,23 @@ void deleteHandle(void *ptr) { delete static_cast<OpenCLBufferHandle *>(ptr); }
 // DataPtr adalah "smart pointer" PyTorch yang tahu
 // di device mana data ini hidup + cara menghapusnya.
 // ─────────────────────────────────────────────
-at::DataPtr OpenCLDeviceAllocator::allocate(size_t nbytes) {
-  c10::impl::VirtualGuardImpl guard(at::kPrivateUse1);
-  const auto device_index = guard.getDevice().index();
-  cl::Context &context = get_cl_context(device_index);
+at::DataPtr OpenCLDeviceAllocator::allocate(size_t nbytes)
+{
+    c10::impl::VirtualGuardImpl guard(at::kPrivateUse1);
+    const auto device_index = guard.getDevice().index();
+    cl::Context &context = get_cl_context(device_index);
 
-  // CL_MEM_READ_WRITE: buffer bisa dibaca dan ditulis kernel
-  cl::Buffer buffer(context, CL_MEM_READ_WRITE, std::max(nbytes, size_t(1)));
+    // CL_MEM_READ_WRITE: buffer bisa dibaca dan ditulis kernel
+    cl::Buffer buffer(context, CL_MEM_READ_WRITE, std::max(nbytes, size_t(1)));
 
-  auto *handle = new OpenCLBufferHandle{std::move(buffer), device_index, nbytes};
+    auto *handle = new OpenCLBufferHandle{std::move(buffer), device_index, nbytes};
 
-  // DataPtr(data, ctx, deleter, device)
-  // - data    : pointer yang dikembalikan ke pengguna (handle kita)
-  // - ctx     : pointer yang dikirim ke deleter
-  // - deleter : fungsi yang dipanggil saat tensor dihapus
-  // - device  : tag untuk PyTorch tahu ini di device mana
-  return {handle, handle, &deleteHandle, at::Device(at::kPrivateUse1, device_index)};
+    // DataPtr(data, ctx, deleter, device)
+    // - data    : pointer yang dikembalikan ke pengguna (handle kita)
+    // - ctx     : pointer yang dikirim ke deleter
+    // - deleter : fungsi yang dipanggil saat tensor dihapus
+    // - device  : tag untuk PyTorch tahu ini di device mana
+    return {handle, handle, &deleteHandle, at::Device(at::kPrivateUse1, device_index)};
 }
 
 // ─────────────────────────────────────────────
@@ -71,8 +72,9 @@ at::DeleterFnPtr OpenCLDeviceAllocator::raw_deleter() const { return &deleteHand
 // TODO: ganti dengan clEnqueueCopyBuffer bila
 // copy data GPU-to-GPU nyata dibutuhkan.
 // ─────────────────────────────────────────────
-void OpenCLDeviceAllocator::copy_data(void *dest, const void *src, std::size_t count) const {
-  std::memcpy(dest, src, count);
+void OpenCLDeviceAllocator::copy_data(void *dest, const void *src, std::size_t count) const
+{
+    std::memcpy(dest, src, count);
 }
 
 // ─────────────────────────────────────────────
@@ -108,14 +110,15 @@ void OpenCLDeviceAllocator::recordStream(const at::DataPtr &, c10::Stream) {}
 // Statistik memori (allocated, reserved, dll).
 // Kembalikan struct kosong — belum ditracking.
 // ─────────────────────────────────────────────
-c10::CachingDeviceAllocator::DeviceStats OpenCLDeviceAllocator::getDeviceStats(c10::DeviceIndex) {
-  return {};
+c10::CachingDeviceAllocator::DeviceStats OpenCLDeviceAllocator::getDeviceStats(c10::DeviceIndex)
+{
+    return {};
 }
 
 void OpenCLDeviceAllocator::resetAccumulatedStats(c10::DeviceIndex) {}
 void OpenCLDeviceAllocator::resetPeakStats(c10::DeviceIndex) {}
 
-}  // namespace c10::opencl
+} // namespace c10::opencl
 
 // ─────────────────────────────────────────────
 // Registrasi global (di luar namespace)
@@ -131,6 +134,6 @@ void OpenCLDeviceAllocator::resetPeakStats(c10::DeviceIndex) {}
 static c10::opencl::OpenCLDeviceAllocator global_opencl_allocator;
 
 static bool register_allocator [[maybe_unused]] = []() {
-  at::SetAllocator(at::kPrivateUse1, &global_opencl_allocator);
-  return true;
+    at::SetAllocator(at::kPrivateUse1, &global_opencl_allocator);
+    return true;
 }();
