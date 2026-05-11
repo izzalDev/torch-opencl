@@ -1,93 +1,136 @@
 #include "runtime/OpenCLDeviceAllocator.h"
 
+#include <CL/cl.h>
 #include <c10/core/Device.h>
-#include <c10/util/Exception.h>
+#include <c10/core/impl/VirtualGuardImpl.h>
+#include <torch/headeronly/core/DeviceType.h>
 
-#include <memory>
-#include <mutex>
-#include <vector>
+#include <CL/opencl.hpp>
+#include <cstring>
 
-#include "runtime/OpenCLException.h"
 #include "runtime/OpenCLFunctions.h"
 
 namespace c10::opencl {
+namespace {
 
-at::DataPtr OpenCLAllocator::allocate(size_t size) {
-  if (size == 0) {
-    return at::DataPtr(nullptr, nullptr, &OpenCLAllocator::Delete,
-                       at::Device(at::DeviceType::PrivateUse1, device_));
-  }
+void deleteHandle(void *ptr) { delete static_cast<OpenCLBufferHandle *>(ptr); }
 
-  cl::Buffer buffer;
-  OPENCL_CHECK(buffer = cl::Buffer(get_cl_context(device_), CL_MEM_READ_WRITE, size));
+}  // namespace
 
-  auto *entry = new BufferEntry{std::move(buffer), size, device_};
+// ─────────────────────────────────────────────
+// allocate()
+//
+// Cara kerja:
+// 1. Tanya guard "device mana yang aktif sekarang?"
+// 2. Ambil cl::Context milik device itu
+// 3. Buat cl::Buffer (memori di GPU) sebesar nbytes
+// 4. Bungkus dalam OpenCLBufferHandle (struct kita)
+// 5. Kembalikan DataPtr — berisi pointer ke handle,
+//    deleter-nya deleteHandle, dan device tag-nya
+//
+// DataPtr adalah "smart pointer" PyTorch yang tahu
+// di device mana data ini hidup + cara menghapusnya.
+// ─────────────────────────────────────────────
+at::DataPtr OpenCLDeviceAllocator::allocate(size_t nbytes) {
+  c10::impl::VirtualGuardImpl guard(at::kPrivateUse1);
+  const auto device_index = guard.getDevice().index();
+  cl::Context &context = get_cl_context(device_index);
 
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    buffers_[static_cast<void *>(entry)] = entry;
-  }
+  // CL_MEM_READ_WRITE: buffer bisa dibaca dan ditulis kernel
+  cl::Buffer buffer(context, CL_MEM_READ_WRITE, std::max(nbytes, size_t(1)));
 
-  return at::DataPtr(static_cast<void *>(entry), static_cast<void *>(entry),
-                     &OpenCLAllocator::Delete, at::Device(at::DeviceType::PrivateUse1, device_));
+  auto *handle = new OpenCLBufferHandle{std::move(buffer), device_index, nbytes};
+
+  // DataPtr(data, ctx, deleter, device)
+  // - data    : pointer yang dikembalikan ke pengguna (handle kita)
+  // - ctx     : pointer yang dikirim ke deleter
+  // - deleter : fungsi yang dipanggil saat tensor dihapus
+  // - device  : tag untuk PyTorch tahu ini di device mana
+  return {handle, handle, &deleteHandle, at::Device(at::kPrivateUse1, device_index)};
 }
 
-void OpenCLAllocator::Delete(void *ctx) {
-  if (ctx == nullptr) return;
+// ─────────────────────────────────────────────
+// raw_deleter()
+//
+// PyTorch kadang perlu tahu fungsi deleter secara
+// eksplisit (misal untuk clone storage). Kembalikan
+// deleteHandle yang sama dengan yang dipakai DataPtr.
+// ─────────────────────────────────────────────
+at::DeleterFnPtr OpenCLDeviceAllocator::raw_deleter() const { return &deleteHandle; }
 
-  auto *entry = static_cast<BufferEntry *>(ctx);
-  DeviceIndex device = entry->device;
-
-  OpenCLAllocator *allocator = getOpenCLAllocator(device);
-
-  {
-    std::lock_guard<std::mutex> lock(allocator->mutex_);
-    allocator->buffers_.erase(ctx);
-    delete entry;
-  }
+// ─────────────────────────────────────────────
+// copy_data()
+//
+// Dipanggil PyTorch saat perlu menyalin data antar
+// storage di device yang sama (misal saat .clone()).
+// Untuk OpenCL yang benar seharusnya pakai
+// clEnqueueCopyBuffer, tapi memcpy cukup untuk
+// bootstrap awal karena handle kita adalah struct
+// di host memory yang membungkus cl::Buffer.
+//
+// TODO: ganti dengan clEnqueueCopyBuffer bila
+// copy data GPU-to-GPU nyata dibutuhkan.
+// ─────────────────────────────────────────────
+void OpenCLDeviceAllocator::copy_data(void *dest, const void *src, std::size_t count) const {
+  std::memcpy(dest, src, count);
 }
 
-void OpenCLAllocator::copy_data(void *dest, const void *src, std::size_t count) const {
-  if (count == 0) return;
+// ─────────────────────────────────────────────
+// initialized()
+//
+// Dipakai PyTorch untuk cek apakah backend sudah
+// siap. Cukup cek ada tidaknya device OpenCL.
+// ─────────────────────────────────────────────
+bool OpenCLDeviceAllocator::initialized() { return device_count() > 0; }
 
-  TORCH_CHECK(dest != nullptr && src != nullptr, "copy_data: null pointer");
+// ─────────────────────────────────────────────
+// emptyCache() — no-op
+//
+// CUDA punya memory pool/cache yang bisa di-flush.
+// OpenCL kita belum punya caching allocator,
+// setiap allocate() langsung ke driver OpenCL.
+// ─────────────────────────────────────────────
+void OpenCLDeviceAllocator::emptyCache(MempoolId_t) {}
 
-  auto *src_entry = static_cast<const BufferEntry *>(src);
-  auto *dest_entry = static_cast<BufferEntry *>(dest);
+// ─────────────────────────────────────────────
+// recordStream() — no-op
+//
+// Dipakai CUDA untuk pastikan memori tidak dibebaskan
+// sebelum operasi di stream selesai.
+// OpenCL kita pakai satu queue per device dan
+// belum punya multi-stream, jadi no-op dulu.
+// ─────────────────────────────────────────────
+void OpenCLDeviceAllocator::recordStream(const at::DataPtr &, c10::Stream) {}
 
-  TORCH_CHECK(src_entry->device == dest_entry->device, "copy_data: source device (",
-              src_entry->device, ") != dest device (", dest_entry->device,
-              "). Cross-device copy not supported here.");
-
-  TORCH_CHECK(count <= src_entry->size, "copy_data: count (", count,
-              ") exceeds source buffer size (", src_entry->size, ")");
-  TORCH_CHECK(count <= dest_entry->size, "copy_data: count (", count,
-              ") exceeds dest buffer size (", dest_entry->size, ")");
-
-  cl::CommandQueue &queue = get_cl_queue(device_);
-  OPENCL_CHECK(queue.enqueueCopyBuffer(src_entry->buffer, dest_entry->buffer, 0, 0, count));
-  OPENCL_CHECK(queue.finish());
+// ─────────────────────────────────────────────
+// getDeviceStats() — kosong
+//
+// Statistik memori (allocated, reserved, dll).
+// Kembalikan struct kosong — belum ditracking.
+// ─────────────────────────────────────────────
+c10::CachingDeviceAllocator::DeviceStats OpenCLDeviceAllocator::getDeviceStats(c10::DeviceIndex) {
+  return {};
 }
 
-static std::vector<std::unique_ptr<OpenCLAllocator>> g_allocators;
-static std::once_flag g_allocator_init_flag;
-
-static void init_allocators() {
-  ensure_initialized();
-  DeviceIndex count = device_count();
-  g_allocators.reserve(count);
-  for (DeviceIndex i = 0; i < count; ++i) {
-    g_allocators.push_back(std::make_unique<OpenCLAllocator>(i));
-  }
-}
-
-OpenCLAllocator *getOpenCLAllocator(DeviceIndex device) {
-  std::call_once(g_allocator_init_flag, init_allocators);
-
-  TORCH_CHECK(device >= 0 && device < static_cast<DeviceIndex>(g_allocators.size()),
-              "getOpenCLAllocator: invalid device index ", device);
-
-  return g_allocators[device].get();
-}
+void OpenCLDeviceAllocator::resetAccumulatedStats(c10::DeviceIndex) {}
+void OpenCLDeviceAllocator::resetPeakStats(c10::DeviceIndex) {}
 
 }  // namespace c10::opencl
+
+// ─────────────────────────────────────────────
+// Registrasi global (di luar namespace)
+//
+// Static initializer jalan saat .so di-load Python.
+// Urutan:
+// 1. global_opencl_allocator dibuat (konstruktor trivial)
+// 2. Lambda dijalankan → at::SetAllocator mendaftarkan
+//    allocator kita ke slot PrivateUse1 di registry PyTorch
+// 3. Sekarang at::GetAllocator(at::kPrivateUse1) akan
+//    mengembalikan &global_opencl_allocator
+// ─────────────────────────────────────────────
+static c10::opencl::OpenCLDeviceAllocator global_opencl_allocator;
+
+static bool register_allocator [[maybe_unused]] = []() {
+  at::SetAllocator(at::kPrivateUse1, &global_opencl_allocator);
+  return true;
+}();

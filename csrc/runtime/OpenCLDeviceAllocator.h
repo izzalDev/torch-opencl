@@ -1,35 +1,59 @@
 #pragma once
 
+#include <ATen/core/TensorBody.h>
 #include <c10/core/Allocator.h>
+#include <c10/core/CachingDeviceAllocator.h>
+#include <c10/core/Device.h>
 
 #include <CL/opencl.hpp>
-#include <mutex>
-#include <unordered_map>
 
 namespace c10::opencl {
 
-struct BufferEntry {
+// ---------------------------------------------------------------------
+// Opaque OpenCL allocation handle
+// Stored inside at::DataPtr
+// ---------------------------------------------------------------------
+struct OpenCLBufferHandle {
   cl::Buffer buffer;
+  c10::DeviceIndex device;
   size_t size;
-  DeviceIndex device;
 };
 
-class OpenCLAllocator : public at::Allocator {
+// ---------------------------------------------------------------------
+// OpenCL device allocator
+// ---------------------------------------------------------------------
+class OpenCLDeviceAllocator final : public c10::DeviceAllocator {
  public:
-  explicit OpenCLAllocator(DeviceIndex device) : device_(device) {}
+  OpenCLDeviceAllocator() = default;
+  ~OpenCLDeviceAllocator() override = default;
 
-  at::DataPtr allocate(size_t size) override;
-  at::DeleterFnPtr raw_deleter() const override { return &OpenCLAllocator::Delete; }
-  void copy_data(void* dest, const void* src, std::size_t count) const override;
+  OpenCLDeviceAllocator(const OpenCLDeviceAllocator &) = delete;
+  OpenCLDeviceAllocator &operator=(const OpenCLDeviceAllocator &) = delete;
 
- private:
-  static void Delete(void* ctx);
+  // Allocate device memory
+  at::DataPtr allocate(size_t nbytes) override;
 
-  DeviceIndex device_;
-  std::unordered_map<void*, BufferEntry*> buffers_;
-  mutable std::mutex mutex_;
+  // Raw deleter used by DataPtr
+  at::DeleterFnPtr raw_deleter() const override;
+
+  // Generic byte copy helper
+  void copy_data(void *dest, const void *src, std::size_t count) const override;
+
+  // Device allocator state
+  bool initialized() override;
+
+  // Cache management (no-op for now)
+  void emptyCache(MempoolId_t mempool_id = {0, 0}) override;
+
+  // Stream tracking (no-op for now)
+  void recordStream(const at::DataPtr &ptr, c10::Stream stream) override;
+
+  // Memory statistics (empty for now)
+  c10::CachingDeviceAllocator::DeviceStats getDeviceStats(c10::DeviceIndex device) override;
+
+  void resetAccumulatedStats(c10::DeviceIndex device) override;
+
+  void resetPeakStats(c10::DeviceIndex device) override;
 };
-
-OpenCLAllocator* getOpenCLAllocator(DeviceIndex device);
 
 }  // namespace c10::opencl

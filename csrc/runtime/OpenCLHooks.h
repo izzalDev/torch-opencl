@@ -5,6 +5,7 @@
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
 #include <c10/core/StorageImpl.h>
+#include <torch/headeronly/core/DeviceType.h>
 
 #include "OpenCLDeviceAllocator.h"
 #include "OpenCLFunctions.h"
@@ -56,8 +57,8 @@ struct OpenCLHooksInterface : public at::PrivateUse1HooksInterface {
 
   at::Device getDeviceFromPtr(void *data) const override {
     TORCH_CHECK(data != nullptr, "getDeviceFromPtr: null pointer");
-    auto *entry = static_cast<const BufferEntry *>(data);
-    return at::Device(at::DeviceType::PrivateUse1, entry->device);
+    auto *handle = static_cast<const OpenCLBufferHandle *>(data);
+    return at::Device(at::kPrivateUse1, handle->device);
   }
 };
 
