@@ -23,6 +23,8 @@ build-backend = "scikit_build_core_conan.build"
 include = ["torch_opencl", "tests"]
 exclude = ["**/node_modules", "**/__pycache__", "build", "**/_deps"]
 reportPrivateImportUsage = "none"
+venvPath = "."
+venv = ".venv"
 
 [tool.scikit-build]
 build-dir = "build"
