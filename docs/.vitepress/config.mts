@@ -1,7 +1,7 @@
-import { withMermaid } from "vitepress-plugin-mermaid";
+import { defineConfig } from "vitepress";
 
 // https://vitepress.dev/reference/site-config
-export default withMermaid({
+export default defineConfig({
   title: "Torch OpenCL",
   description: "A VitePress Site",
   themeConfig: {
@@ -17,6 +17,7 @@ export default withMermaid({
         items: [
           { text: "Markdown Examples", link: "/markdown-examples" },
           { text: "Runtime API Examples", link: "/api-examples" },
+          { text: "Architecture", link: "/ARCHITECTURE" },
         ],
       },
       {
