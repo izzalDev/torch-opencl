@@ -4,21 +4,16 @@
 #include <torch/library.h>
 
 #include "runtime/OpenCLDeviceAllocator.h"
-#include "runtime/OpenCLFunctions.h"
 
 namespace at::opencl {
 
 namespace {
 
-at::Tensor wrapper__empty_strided(c10::IntArrayRef size, c10::IntArrayRef stride,
-                                  std::optional<at::ScalarType> dtype_opt,
-                                  std::optional<at::Layout> layout_opt,
-                                  std::optional<at::Device> device_opt,
-                                  std::optional<bool> pin_memory_opt) {
-  // Resolve device — default to current OpenCL device
-  c10::DeviceIndex device_index =
-      device_opt.has_value() ? device_opt->index() : c10::opencl::current_device();
-
+at::Tensor empty_strided(c10::IntArrayRef size, c10::IntArrayRef stride,
+                         std::optional<at::ScalarType> dtype_opt,
+                         std::optional<at::Layout> layout_opt, std::optional<at::Device> device_opt,
+                         std::optional<bool> pin_memory_opt) {
+  c10::DeviceIndex device_index = device_opt->index();
   at::ScalarType dtype = dtype_opt.value_or(at::ScalarType::Float);
   auto *allocator = c10::opencl::getOpenCLAllocator(device_index);
 
@@ -44,6 +39,6 @@ at::Tensor wrapper__empty_strided(c10::IntArrayRef size, c10::IntArrayRef stride
 
 }  // namespace
 
-TORCH_LIBRARY_IMPL(aten, PrivateUse1, m) { m.impl("empty_strided", wrapper__empty_strided); }
+TORCH_LIBRARY_IMPL(aten, PrivateUse1, m) { m.impl("empty_strided", empty_strided); }
 
 }  // namespace at::opencl
