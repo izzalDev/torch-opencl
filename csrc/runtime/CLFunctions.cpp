@@ -1,4 +1,4 @@
-#include "runtime/OpenCLFunctions.h"
+#include "runtime/CLFunctions.h"
 
 #include <c10/core/Device.h>
 #include <c10/util/CallOnce.h>

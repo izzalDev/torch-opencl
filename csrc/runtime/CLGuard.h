@@ -3,15 +3,15 @@
 #include <c10/core/Device.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 
-#include "runtime/OpenCLFunctions.h"
+#include "runtime/CLFunctions.h"
 
 namespace c10::opencl {
 
-struct OpenCLGuardImpl final : public c10::impl::DeviceGuardImplInterface {
+struct CLGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     static constexpr DeviceType static_type = c10::DeviceType::PrivateUse1;
 
-    OpenCLGuardImpl() = default;
-    explicit OpenCLGuardImpl(DeviceType t)
+    CLGuardImpl() = default;
+    explicit CLGuardImpl(DeviceType t)
     {
         TORCH_CHECK(
             t == static_type, "OpenCLGuardImpl initialized with non-PrivateUse1 DeviceType: ", t

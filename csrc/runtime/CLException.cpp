@@ -1,4 +1,4 @@
-#include "runtime/OpenCLException.h"
+#include "runtime/CLException.h"
 
 #include <string>
 

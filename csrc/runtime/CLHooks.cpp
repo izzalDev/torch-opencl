@@ -1,4 +1,4 @@
-#include "OpenCLHooks.h"
+#include "runtime/CLHooks.h"
 
 // LITERALINCLUDE START: OPENCL HOOK REGISTER
 namespace c10::opencl {

@@ -7,8 +7,8 @@
 #include <c10/core/StorageImpl.h>
 #include <torch/headeronly/core/DeviceType.h>
 
-#include "OpenCLDeviceAllocator.h"
-#include "OpenCLFunctions.h"
+#include "CLFunctions.h"
+#include "runtime/CLDeviceAllocator.h"
 
 namespace c10::opencl {
 struct OpenCLHooksInterface : public at::PrivateUse1HooksInterface {
@@ -66,7 +66,7 @@ struct OpenCLHooksInterface : public at::PrivateUse1HooksInterface {
     at::Device getDeviceFromPtr(void *data) const override
     {
         TORCH_CHECK(data != nullptr, "getDeviceFromPtr: null pointer");
-        auto *handle = static_cast<const OpenCLBufferHandle *>(data);
+        auto *handle = static_cast<const CLAllocation *>(data);
         return at::Device(at::kPrivateUse1, handle->device);
     }
 };
