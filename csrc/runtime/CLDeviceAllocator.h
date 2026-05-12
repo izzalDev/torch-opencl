@@ -13,22 +13,26 @@ namespace c10::opencl {
 // Opaque OpenCL allocation handle
 // Stored inside at::DataPtr
 // ---------------------------------------------------------------------
-struct OpenCLBufferHandle {
+struct CLAllocation {
     cl::Buffer buffer;
     c10::DeviceIndex device;
     size_t size;
+    CLAllocation(cl::Buffer buf, c10::DeviceIndex dev, size_t sz)
+        : buffer(std::move(buf)), device(dev), size(sz)
+    {
+    }
 };
 
 // ---------------------------------------------------------------------
 // OpenCL device allocator
 // ---------------------------------------------------------------------
-class OpenCLDeviceAllocator final : public c10::DeviceAllocator {
+class CLDeviceAllocator final : public c10::DeviceAllocator {
   public:
-    OpenCLDeviceAllocator() = default;
-    ~OpenCLDeviceAllocator() override = default;
+    CLDeviceAllocator() = default;
+    ~CLDeviceAllocator() override = default;
 
-    OpenCLDeviceAllocator(const OpenCLDeviceAllocator &) = delete;
-    OpenCLDeviceAllocator &operator=(const OpenCLDeviceAllocator &) = delete;
+    CLDeviceAllocator(const CLDeviceAllocator &) = delete;
+    CLDeviceAllocator &operator=(const CLDeviceAllocator &) = delete;
 
     // Allocate device memory
     at::DataPtr allocate(size_t nbytes) override;
