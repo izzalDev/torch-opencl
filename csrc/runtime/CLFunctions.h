@@ -8,12 +8,6 @@
 namespace c10::opencl {
 
 DeviceIndex device_count() noexcept;
-DeviceIndex current_device();
-void set_device(DeviceIndex device);
-
-DeviceIndex exchange_device(DeviceIndex device);
-DeviceIndex maybe_exchange_device(DeviceIndex device);
-
 bool is_in_bad_fork();
 void ensure_initialized();
 

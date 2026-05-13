@@ -3,59 +3,42 @@
 #include <c10/core/Device.h>
 #include <c10/core/impl/DeviceGuardImplInterface.h>
 
-#include "runtime/CLFunctions.h"
-
 namespace c10::opencl {
 
 struct CLGuardImpl final : public c10::impl::DeviceGuardImplInterface {
     static constexpr DeviceType static_type = c10::DeviceType::PrivateUse1;
 
-    CLGuardImpl() = default;
-    explicit CLGuardImpl(DeviceType t)
-    {
-        TORCH_CHECK(
-            t == static_type, "OpenCLGuardImpl initialized with non-PrivateUse1 DeviceType: ", t
-        );
-    }
+    CLGuardImpl();
 
-    DeviceType type() const override { return static_type; }
+    explicit CLGuardImpl(DeviceType t);
 
-    Device exchangeDevice(Device d) const override
-    {
-        TORCH_CHECK(d.is_privateuseone(), "Expected a PrivateUse1 device, but got ", d);
-        auto old = exchange_device(d.index());
-        return Device(static_type, old);
-    }
+    DeviceType type() const override;
 
-    Device getDevice() const override { return Device(static_type, current_device()); }
+    Device exchangeDevice(Device d) const override;
 
-    void setDevice(Device d) const override
-    {
-        TORCH_CHECK(d.is_privateuseone(), "Expected a PrivateUse1 device, but got ", d);
-        set_device(d.index());
-    }
+    Device getDevice() const override;
 
-    void uncheckedSetDevice(Device d) const noexcept override { set_device(d.index()); }
+    void setDevice(Device d) const override;
 
-    DeviceIndex deviceCount() const noexcept override { return device_count(); }
+    void uncheckedSetDevice(Device d) const noexcept override;
 
-    void synchronizeDevice(const DeviceIndex device_index) const override
-    {
-        get_cl_queue(device_index).finish();
-    }
+    DeviceIndex deviceCount() const noexcept override;
 
+    void synchronizeStream(const Stream &stream) const override;
+
+    void synchronizeDevice(DeviceIndex device_index) const override;
+
+    /**
+     * OpenCL backend currently exposes a single implicit queue per device.
+     * Stream APIs therefore map to a synthetic default stream.
+     */
     Stream getStream(Device d) const noexcept override { return Stream(Stream::UNSAFE, d, 0); }
 
-    Stream getDefaultStream(Device d) const override { return getStream(d); }
-
-    Stream exchangeStream(Stream s) const noexcept override { return getStream(s.device()); }
-
-    bool queryStream(const Stream &) const override { return false; }
-
-    void synchronizeStream(const Stream &stream) const override
-    {
-        get_cl_queue(stream.device_index()).finish();
-    }
+    /**
+     * No dedicated stream state exists.
+     * Return the synthetic default stream unchanged.
+     */
+    Stream exchangeStream(Stream s) const noexcept override { return s; }
 };
 
 } // namespace c10::opencl

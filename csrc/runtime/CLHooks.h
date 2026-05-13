@@ -2,73 +2,78 @@
 
 #include <ATen/core/CachingHostAllocator.h>
 #include <ATen/detail/PrivateUse1HooksInterface.h>
+
 #include <c10/core/Allocator.h>
 #include <c10/core/Device.h>
-#include <c10/core/StorageImpl.h>
-#include <torch/headeronly/core/DeviceType.h>
+#include <c10/core/impl/DeviceGuardImplInterface.h>
 
-#include "CLFunctions.h"
 #include "runtime/CLDeviceAllocator.h"
+#include "runtime/CLFunctions.h"
+#include "runtime/CLGuard.h"
 
 namespace c10::opencl {
+
 struct OpenCLHooksInterface : public at::PrivateUse1HooksInterface {
-    OpenCLHooksInterface() {};
+    OpenCLHooksInterface() = default;
     ~OpenCLHooksInterface() override = default;
 
-    void init() const override
+    void init() const override { ensure_initialized(); }
+
+    // Return whether the specified device has an initialized primary context.
+    bool hasPrimaryContext(DeviceIndex device_index) const override
     {
-        // Initialize OpenCL runtime if needed
-        // This is called when PyTorch first accesses the device
+        return device_index >= 0 && device_index < device_count();
     }
 
-    bool hasPrimaryContext(DeviceIndex device_index) const override { return true; }
+    // Return whether the backend was compiled into the current build.
+    bool isBuilt() const override { return true; }
 
-    bool isBuilt() const override
-    {
-        // This extension is compiled as part of the OpenCL test extension.
-        return true;
-    }
-
-    bool isAvailable() const override
-    {
-        // Consider OpenReg available if there's at least one device reported.
-        return device_count() > 0;
-    }
+    bool isAvailable() const override { return device_count() > 0; }
 
     DeviceIndex deviceCount() const override { return device_count(); }
 
-    void setCurrentDevice(DeviceIndex device) const override { set_device(device); }
-
-    DeviceIndex getCurrentDevice() const override { return current_device(); }
-
-    DeviceIndex exchangeDevice(DeviceIndex device) const override
+    void setCurrentDevice(DeviceIndex device) const override
     {
-        return exchange_device(device);
+        guard_.setDevice(Device(DeviceType::PrivateUse1, device));
     }
 
+    DeviceIndex getCurrentDevice() const override { return guard_.getDevice().index(); }
+
+    // Exchange the current device and return the previous device index.
+    DeviceIndex exchangeDevice(DeviceIndex device) const override
+    {
+        return guard_.exchangeDevice(Device(DeviceType::PrivateUse1, device)).index();
+    }
+
+    // Exchange the device only if the requested index is valid.
     DeviceIndex maybeExchangeDevice(DeviceIndex device) const override
     {
-        // Only exchange if the requested device is valid; otherwise, no-op and return current
-        auto count = device_count();
+        const auto count = device_count();
         if (device < 0 || device >= count) {
             return getCurrentDevice();
         }
         return exchangeDevice(device);
     }
 
+    // Return the pinned host memory allocator associated with this backend.
     at::Allocator *getPinnedMemoryAllocator() const override
     {
         return at::getHostAllocator(at::kPrivateUse1);
     }
 
+    // Return whether the pointer refers to pinned host memory.
     bool isPinnedPtr(const void *data) const override { return false; }
 
+    // Return the device associated with an allocation pointer.
     at::Device getDeviceFromPtr(void *data) const override
     {
         TORCH_CHECK(data != nullptr, "getDeviceFromPtr: null pointer");
         auto *handle = static_cast<const CLAllocation *>(data);
         return at::Device(at::kPrivateUse1, handle->device);
     }
+
+  private:
+    mutable CLGuardImpl guard_;
 };
 
 } // namespace c10::opencl
