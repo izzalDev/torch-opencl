@@ -2,24 +2,24 @@
 
 #include <CL/cl.h>
 #include <CL/opencl.hpp>
-#include <atomic>
 #include <c10/core/Device.h>
 #include <c10/core/impl/VirtualGuardImpl.h>
 #include <mutex>
 #include <torch/headeronly/core/DeviceType.h>
 #include <vector>
 
-#include "runtime/OpenCLFunctions.h"
+#include "runtime/CLFunctions.h"
 
 namespace c10::opencl {
 
 namespace {
 
 struct DeviceStatsTracker {
-    std::atomic<int64_t> current_allocated{0};
-    std::atomic<int64_t> peak_allocated{0};
-    std::atomic<int64_t> num_allocs{0};
-    std::atomic<int64_t> num_frees{0};
+    int64_t current_allocated{0};
+    int64_t peak_allocated{0};
+    int64_t num_allocs{0};
+    int64_t num_frees{0};
+    int64_t num_ooms{0};
 };
 
 /**
@@ -80,6 +80,9 @@ at::DataPtr CLDeviceAllocator::allocate(size_t nbytes)
     cl_int err = CL_SUCCESS;
     cl::Buffer buffer(context, CL_MEM_READ_WRITE, nbytes, nullptr, &err);
 
+    if (err == CL_MEM_OBJECT_ALLOCATION_FAILURE)
+        tracker.num_ooms++;
+
     TORCH_CHECK(
         err == CL_SUCCESS,
         "OpenCL clCreateBuffer failed with error code: ",
@@ -87,14 +90,11 @@ at::DataPtr CLDeviceAllocator::allocate(size_t nbytes)
         ". Potential Out of Memory (OOM) on GPU."
     );
 
-    // Atomic statistics update
     tracker.num_allocs++;
-    int64_t current = tracker.current_allocated.fetch_add(nbytes) + nbytes;
+    tracker.current_allocated += nbytes;
 
-    // Update peak using atomic CAS loop
-    int64_t old_peak = tracker.peak_allocated.load();
-    while (current > old_peak && !tracker.peak_allocated.compare_exchange_weak(old_peak, current))
-        ;
+    if (tracker.current_allocated > tracker.peak_allocated)
+        tracker.peak_allocated = tracker.current_allocated;
 
     auto handle = std::make_unique<CLAllocation>(std::move(buffer), device_index, nbytes);
     auto *raw = handle.release();
@@ -138,19 +138,17 @@ CLDeviceAllocator::getDeviceStats(c10::DeviceIndex device_index)
     c10::CachingDeviceAllocator::DeviceStats stats;
     auto &tracker = get_tracker(device_index);
 
-    // Get values from our atomic tracker
-    int64_t current_val = tracker.current_allocated.load();
-    int64_t peak_val = tracker.peak_allocated.load();
+    int64_t current_val = tracker.current_allocated;
+    int64_t peak_val = tracker.peak_allocated;
 
-    // Mapping bytes (Usually StatArray)
     stats.allocated_bytes[0].current = current_val;
     stats.allocated_bytes[0].peak = peak_val;
-
-    stats.num_device_alloc = tracker.num_allocs.load();
-    stats.num_device_free = tracker.num_frees.load();
+    stats.num_device_alloc = tracker.num_allocs;
+    stats.num_device_free = tracker.num_frees;
 
     stats.reserved_bytes[0].current = current_val;
     stats.reserved_bytes[0].peak = peak_val;
+    stats.num_ooms = tracker.num_ooms;
 
     return stats;
 }
@@ -165,7 +163,7 @@ void CLDeviceAllocator::resetAccumulatedStats(c10::DeviceIndex device_index)
 void CLDeviceAllocator::resetPeakStats(c10::DeviceIndex device_index)
 {
     auto &tracker = get_tracker(device_index);
-    tracker.peak_allocated.store(tracker.current_allocated.load());
+    tracker.peak_allocated = tracker.current_allocated;
 }
 
 } // namespace c10::opencl

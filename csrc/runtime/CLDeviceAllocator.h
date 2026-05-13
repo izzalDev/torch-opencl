@@ -52,7 +52,7 @@ class CLDeviceAllocator final : public c10::DeviceAllocator {
     // Stream tracking (no-op for now)
     void recordStream(const at::DataPtr &ptr, c10::Stream stream) override;
 
-    // Memory statistics (empty for now)
+    // Memory statistics
     c10::CachingDeviceAllocator::DeviceStats getDeviceStats(c10::DeviceIndex device) override;
 
     void resetAccumulatedStats(c10::DeviceIndex device) override;

@@ -3,7 +3,7 @@
 
 #include <c10/core/Device.h>
 
-#include "runtime/OpenCLFunctions.h"
+#include "runtime/CLFunctions.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
