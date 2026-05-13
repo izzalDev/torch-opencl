@@ -5,7 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "izzalDev", email = "rizal.fadlullah@gmail.com" }]
-dependencies = ["numpy<2.4", "torch>=2.11"]
+dependencies = [
+    "nanobind",
+    "numpy<2.4",
+    "torch>=2.6",
+]
 
 [project.entry-points."torch.backends"]
 opencl = "torch_opencl:_autoload"
@@ -19,7 +23,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["nanobind>=2.12.0", "scikit-build-core-conan>=0.9", "torch>=2.11"]
+requires = ["nanobind", "scikit-build-core-conan", "torch"]
 build-backend = "scikit_build_core_conan.build"
 
 [tool.pyright]
@@ -46,6 +50,7 @@ cache-keys = [
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+nanobind = { git = "https://github.com/Doekin/nanobind.git", rev = "stubgen_win_dll" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

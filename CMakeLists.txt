@@ -53,18 +53,17 @@ endif()
 
 install(TARGETS ${MODULE_NAME} DESTINATION ${INSTALL_DIR})
 
-if(NOT WIN32)
-    nanobind_add_stub(
-        ${STUB_TARGET}
-        MODULE      ${MODULE_NAME}
-        OUTPUT      ${STUB_FILE}
-        PYTHON_PATH $<TARGET_FILE_DIR:${MODULE_NAME}>
-        DEPENDS     ${MODULE_NAME}
-        MARKER_FILE py.typed
-    )
-    install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/${STUB_FILE}
-        ${CMAKE_CURRENT_BINARY_DIR}/py.typed
-        DESTINATION ${INSTALL_DIR}
-    )
-endif()
+nanobind_add_stub(
+		${STUB_TARGET}
+		MODULE      ${MODULE_NAME}
+		OUTPUT      ${STUB_FILE}
+		PYTHON_PATH $<TARGET_FILE_DIR:${MODULE_NAME}>
+		DEPENDS     ${MODULE_NAME}
+		LIB_PATH  	$<TARGET_FILE_DIR:torch>
+		MARKER_FILE py.typed
+)
+install(FILES
+		${CMAKE_CURRENT_BINARY_DIR}/${STUB_FILE}
+		${CMAKE_CURRENT_BINARY_DIR}/py.typed
+		DESTINATION ${INSTALL_DIR}
+)
