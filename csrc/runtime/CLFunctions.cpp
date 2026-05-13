@@ -32,6 +32,7 @@ static pid_t g_original_pid = -1;
 static void init_opencl_runtime()
 {
     g_original_pid = getpid();
+    std::vector<DeviceContext> tmp;
 
     std::vector<cl::Platform> platforms;
     try {
@@ -60,12 +61,13 @@ static void init_opencl_runtime()
 
         for (auto &dev : platform_devs) {
             try {
-                g_devices.push_back({dev, ctx, cl::CommandQueue(*ctx, dev)});
+                tmp.push_back({dev, ctx, cl::CommandQueue(*ctx, dev)});
             } catch (const cl::Error &) {
                 continue;
             }
         }
     }
+    g_devices = std::move(tmp);
 }
 
 void ensure_initialized()
