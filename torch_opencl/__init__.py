@@ -1,5 +1,4 @@
 import torch as _torch
-
 from . import opencl
 from .opencl import (
     current_device,
@@ -12,7 +11,7 @@ from .opencl import (
 )
 
 
-def _setup_backend():
+def _autoload():
     from torch.utils.backend_registration import (
         generate_methods_for_privateuse1_backend as _generate,
         rename_privateuse1_backend as _rename,
@@ -23,8 +22,6 @@ def _setup_backend():
     _generate(for_storage=True)
 
 
-_setup_backend()
-
 __all__ = [
     "device",
     "device_count",
@@ -33,4 +30,5 @@ __all__ = [
     "is_available",
     "init",
     "is_initialized",
+    "_autoload",
 ]

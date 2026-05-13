@@ -9,9 +9,9 @@ def pytest_configure():
     """
     try:
         # We use a dummy assignment to satisfy "not accessed" linters
-        import torch_opencl
+        import torch
 
-        _ = torch_opencl
+        _ = torch
     except ImportError:
         pass
 
@@ -23,11 +23,11 @@ def opencl_backend() -> Any:
     Skips tests if the package isn't built/installed.
     """
     try:
-        import torch_opencl.opencl as opencl
+        import torch.opencl as opencl  # pyright: ignore
 
         return opencl
     except ImportError:
-        pytest.skip("torch_opencl is not installed. Please run 'pip install -e .'")
+        pytest.fail("torch_opencl is not installed. Please run 'pip install -e .'")
 
 
 @pytest.fixture(scope="session")
@@ -53,9 +53,9 @@ def reset_device_state(has_device: bool):
     yield
 
     try:
-        from torch_opencl import _C
+        import torch
 
-        _C.set_device(0)
+        torch.opencl.set_device(0)  # pyright: ignore
     except Exception:
         pass
 

@@ -7,6 +7,9 @@ requires-python = ">=3.10"
 authors = [{ name = "izzalDev", email = "rizal.fadlullah@gmail.com" }]
 dependencies = ["numpy<2.4", "torch>=2.11"]
 
+[project.entry-points."torch.backends"]
+opencl = "torch_opencl:_autoload"
+
 [dependency-groups]
 dev = [
 	"nanobind>=2.12.0",
