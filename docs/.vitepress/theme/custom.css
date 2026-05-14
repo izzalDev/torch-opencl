@@ -1,0 +1,36 @@
+:root{
+	--vp-font-family-mono: "JetBrainsMono Nerd Font","JetBrainsMono", monospace;
+}
+
+div[class*="language-"] code{
+	line-height: 1.2 !important;
+	display: block;
+}
+
+.mermaid {
+	display: flex;
+	justify-content: center;
+	margin: 2rem 0;
+}
+
+.mermaid svg {
+	max-width: 100%;
+	height: auto;
+}
+
+.vp-doc table {
+  display: table;
+  margin-left: auto;
+  margin-right: auto;
+	min-width: 560px
+}
+
+.vp-doc th{
+	text-align: center;
+}
+
+.vp-doc img, .vp-doc .mermaid {
+	display: flex;
+	justify-content: center;
+	margin: 2rem auto;
+}

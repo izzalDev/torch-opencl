@@ -1,1 +1,17 @@
-AllowShortFunctionsOnASingleLine: None
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterNamespace: false
+BinPackParameters: false
+BinPackArguments: false
+AlignAfterOpenBracket: BlockIndent
+PointerAlignment: Right
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+NamespaceIndentation: None
+FixNamespaceComments: true
+MaxEmptyLinesToKeep: 1
