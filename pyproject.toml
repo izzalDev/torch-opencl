@@ -51,6 +51,10 @@ output-folder = "build"
 fallback_version = "0.1.0-dev"
 local_scheme = "no-local-version"
 
+[tool.scikit-build-core-conan]
+settings-all = ["compiler.cppstd=17"]
+output-dir = "build"
+
 [tool.uv]
 no-build-isolation-package = ["torch-opencl"]
 cache-keys = [
