@@ -5,7 +5,6 @@ layout: home
 hero:
   name: "Torch OpenCL"
   text: "OpenCL Backend for PyTorch"
-  tagline: "Experimental PyTorch backend using OpenCL and PrivateUse1 integration."
   actions:
     - theme: brand
       text: Architecture
