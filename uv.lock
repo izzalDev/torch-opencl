@@ -827,7 +827,6 @@ dependencies = [
     { name = "nanobind" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "python_full_version >= '3.11'" },
-    { name = "setuptools-scm" },
     { name = "torch", version = "2.11.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.11.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
 ]
@@ -838,13 +837,13 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "scikit-build-core-conan" },
+    { name = "setuptools-scm" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "nanobind", git = "https://github.com/Doekin/nanobind.git?rev=stubgen_win_dll" },
     { name = "numpy", specifier = "<2.4" },
-    { name = "setuptools-scm", specifier = ">=10.0.5" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.6" },
     { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.6", index = "https://download.pytorch.org/whl/cpu" },
 ]
@@ -855,6 +854,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.6.0" },
     { name = "pytest", specifier = ">=9.0" },
     { name = "scikit-build-core-conan", specifier = ">=0.9" },
+    { name = "setuptools-scm", specifier = ">=8.0" },
 ]
 
 [[package]]

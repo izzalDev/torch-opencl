@@ -28,8 +28,8 @@ dev = [
 requires = [
   "nanobind",
   "scikit-build-core-conan",
-  "setuptools-scm>=8.0",
-  "torch"
+  "setuptools-scm",
+  "torch",
 ]
 build-backend = "scikit_build_core_conan.build"
 
