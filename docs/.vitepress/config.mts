@@ -1,4 +1,4 @@
-import { defineConfig } from "vitepress";
+import { defineConfig } from "@lando/vitepress-theme-default-plus/config";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -28,6 +28,7 @@ export default defineConfig({
           { text: "Runtime Flow", link: "/architecture/runtime-flow" },
           { text: "Runtime Layer", link: "/architecture/runtime-layer" },
           { text: "Allocator Design", link: "/architecture/allocator-design" },
+          { text: "Device Allocator", link: "/runtime/device-allocator" },
           {
             text: "Dispatcher Integration",
             link: "/architecture/dispatcher-integration",

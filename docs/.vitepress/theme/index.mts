@@ -1,32 +1,26 @@
 import "./custom.css";
 import { h, nextTick, watch } from "vue";
 import type { Theme } from "vitepress";
-import DefaultTheme from "vitepress/theme";
+import VPLTheme from "@lando/vitepress-theme-default-plus";
 import { useData } from "vitepress";
 import { createMermaidRenderer } from "vitepress-mermaid-renderer";
 
 export default {
-  extends: DefaultTheme,
+  extends: VPLTheme,
   Layout: () => {
     const { isDark } = useData();
-
     const initMermaid = () => {
-      const mermaidRenderer = createMermaidRenderer({
+      createMermaidRenderer({
         theme: isDark.value ? "dark" : "forest",
       });
     };
-
-    // initial mermaid setup
     nextTick(() => initMermaid());
-
-    // on theme change, re-render mermaid charts
     watch(
       () => isDark.value,
       () => {
         initMermaid();
       },
     );
-
-    return h(DefaultTheme.Layout);
+    return h(VPLTheme.Layout);
   },
 } satisfies Theme;
