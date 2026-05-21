@@ -48,3 +48,39 @@ def test_device_context_manager_nesting(device_count, opencl_backend):
         with opencl_backend.device(0):
             assert opencl_backend.current_device() == 0
         assert opencl_backend.current_device() == 1
+
+
+@pytest.mark.usefixtures("has_device")
+def test_lifecycle_apis(opencl_backend):
+    """Test high-level initialization and status APIs."""
+    # Since we've already run tests, opencl should be initialized
+    assert opencl_backend.is_initialized() is True
+
+    # Calling init again should be safe and idempotent
+    opencl_backend.init()
+    assert opencl_backend.is_initialized() is True
+
+
+def test_is_in_bad_fork():
+    """Verify is_in_bad_fork binding runs and returns a boolean."""
+    from torch_opencl import _C
+
+    res = _C.is_in_bad_fork()
+    assert isinstance(res, bool)
+
+
+@pytest.mark.usefixtures("has_device")
+def test_exchange_device_binding(opencl_backend):
+    """Test the low-level _C.exchange_device binding directly."""
+    from torch_opencl import _C
+
+    initial = _C.get_device()
+
+    # Switch to 0 (always valid if has_device)
+    prev = _C.exchange_device(0)
+    assert prev == initial
+    assert _C.get_device() == 0
+
+    # Restore the initial device
+    _C.exchange_device(initial)
+    assert _C.get_device() == initial

@@ -44,7 +44,7 @@ class TestEmptyStrided:
         assert t.dtype == torch.int32
 
     def test_mismatched_size_stride_raises(self):
-        with pytest.raises(Exception, match="same length"):
+        with pytest.raises(RuntimeError, match="must match dimensionality"):
             torch.empty_strided((3, 4), (1,), device="opencl")
 
     def test_non_strided_layout_raises(self):
@@ -96,3 +96,86 @@ class TestCopyFrom:
         src = torch.ones(4).to("opencl:0")
         with pytest.raises(RuntimeError, match="peer-to-peer"):
             src.to("opencl:1")
+
+    def test_copy_mismatched_dtype_raises(self):
+        """Verify copy_from rejects mismatched datatypes."""
+        src = torch.ones(4, dtype=torch.float32).to("opencl")
+        dst = torch.zeros(4, dtype=torch.int32).to("opencl")
+        with pytest.raises(RuntimeError, match="dtype mismatch"):
+            torch.ops.aten._copy_from(src, dst)
+
+    def test_copy_mismatched_numel_raises(self):
+        """Verify copy_from rejects mismatched sizes."""
+        src = torch.ones(4).to("opencl")
+        dst = torch.zeros(5).to("opencl")
+        with pytest.raises(RuntimeError, match="numel mismatch"):
+            torch.ops.aten._copy_from(src, dst)
+
+    def test_copy_non_contiguous_raises(self):
+        """Verify copy_from rejects non-contiguous tensors."""
+        src = torch.empty_strided((2, 2), (1, 2), device="opencl")
+        dst = torch.empty((2, 2), device="opencl")
+        # Column-major tensor is non-contiguous
+        assert not src.is_contiguous()
+        with pytest.raises(RuntimeError, match="src must be contiguous"):
+            torch.ops.aten._copy_from(src, dst)
+
+
+@pytest.mark.usefixtures("has_device")
+class TestAsStrided:
+    def test_as_strided_basic(self):
+        """Verify basic as_strided usage and storage sharing."""
+        base = torch.arange(8, dtype=torch.float32).to("opencl")
+        view = torch.as_strided(base, (3,), (2,), 1)
+        assert view.device.type == "opencl"
+        assert view.shape == torch.Size([3])
+        assert view.stride() == (2,)
+        assert view.storage_offset() == 1
+        assert view.storage().data_ptr() == base.storage().data_ptr()
+
+    def test_as_strided_negative_stride_raises(self):
+        """Verify that negative strides are rejected."""
+        base = torch.empty(4, device="opencl")
+        with pytest.raises(RuntimeError, match="negative stride not supported"):
+            torch.as_strided(base, (2,), (-1,), 0)
+
+    def test_as_strided_mismatched_size_stride_raises(self):
+        """Verify size and stride dimensionality mismatch raises."""
+        base = torch.empty(4, device="opencl")
+        with pytest.raises(RuntimeError, match="must have same length"):
+            torch.as_strided(base, (2, 2), (1,), 0)
+
+    def test_as_strided_negative_offset_raises(self):
+        """Verify negative storage offset raises."""
+        base = torch.empty(4, device="opencl")
+        with pytest.raises(RuntimeError, match="invalid storage_offset"):
+            torch.as_strided(base, (2,), (1,), -1)
+
+
+@pytest.mark.usefixtures("has_device")
+class TestResize:
+    def test_resize_smaller(self):
+        """Verify resizing a tensor smaller updates metadata and retains storage."""
+        t = torch.empty((4, 4), device="opencl")
+        original_ptr = t.storage().data_ptr()
+        t.resize_((2, 2))
+        assert t.shape == torch.Size([2, 2])
+        assert t.storage().data_ptr() == original_ptr
+
+    def test_resize_scalar(self):
+        """Verify resizing a scalar tensor."""
+        t = torch.empty((), device="opencl")
+        assert t.ndim == 0
+        t.resize_((1,))
+        assert t.shape == torch.Size([1])
+
+
+@pytest.mark.usefixtures("has_device")
+class TestReshapeAlias:
+    def test_reshape_alias_basic(self):
+        """Verify _reshape_alias behaves as an alias and shares storage."""
+        base = torch.ones((2, 3)).to("opencl")
+        reshaped = torch.ops.aten._reshape_alias(base, [6], [1])
+        assert reshaped.shape == torch.Size([6])
+        assert reshaped.device.type == "opencl"
+        assert reshaped.storage().data_ptr() == base.storage().data_ptr()
