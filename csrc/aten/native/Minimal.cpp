@@ -1,61 +1,12 @@
 #include "aten/native/Minimal.h"
 
+#include <ATen/EmptyTensor.h>
 #include <torch/library.h>
 
 #include "runtime/CLDeviceAllocator.h"
 #include "runtime/CLFunctions.h"
 
 namespace at::native::opencl {
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Allocate OpenCL storage and build a tensor with the given size and stride.
- * Both empty_memory_format and empty_strided funnel through here.
- *
- * Storage size covers the highest byte address reachable via the strides so
- * that non-contiguous layouts (column-major, transposed, etc.) are safe.
- */
-static at::Tensor make_opencl_tensor(
-    c10::IntArrayRef size, c10::IntArrayRef stride, c10::ScalarType dtype, c10::Device device
-)
-{
-    TORCH_INTERNAL_ASSERT(device.is_privateuseone());
-
-    const c10::DeviceGuard guard(device);
-
-    size_t nbytes = 0;
-    if (c10::multiply_integers(size) > 0) {
-        // last_offset (in elements) = 1 + sum_i( (size[i]-1) * |stride[i]| )
-        int64_t last_offset = 1;
-        for (size_t i = 0; i < size.size(); ++i)
-            last_offset += (size[i] - 1) * std::abs(stride[i]);
-
-        nbytes = static_cast<size_t>(last_offset) * c10::elementSize(dtype);
-    }
-
-    auto *alloc = at::GetAllocator(at::kPrivateUse1);
-    TORCH_CHECK(alloc, "OpenCL allocator not registered");
-
-    auto storage = c10::make_intrusive<c10::StorageImpl>(
-        c10::StorageImpl::use_byte_size_t(),
-        nbytes,
-        nbytes > 0 ? alloc->allocate(nbytes) : at::DataPtr{},
-        alloc,
-        /*resizable=*/true
-    );
-
-    auto tensor = at::detail::make_tensor<c10::TensorImpl>(
-        std::move(storage),
-        c10::DispatchKeySet(c10::DispatchKey::PrivateUse1),
-        c10::scalarTypeToTypeMeta(dtype)
-    );
-
-    tensor.unsafeGetTensorImpl()->set_sizes_and_strides(size, stride);
-    return tensor;
-}
 
 /**
  * Return the CLAllocation handle stored inside a tensor's DataPtr.
@@ -66,7 +17,9 @@ static at::Tensor make_opencl_tensor(
  */
 static const c10::opencl::CLAllocation *get_cl_allocation(const at::Tensor &t)
 {
-    return static_cast<const c10::opencl::CLAllocation *>(t.storage().data_ptr().get());
+    return static_cast<const c10::opencl::CLAllocation *>(
+        t.storage().data_ptr().get()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -83,32 +36,23 @@ at::Tensor empty_memory_format(
     std::optional<c10::MemoryFormat> memory_format_opt
 )
 {
+    const auto device = c10::device_or_default(device_opt);
+    const auto dtype = c10::dtype_or_default(dtype_opt);
+    TORCH_CHECK(device.is_privateuseone());
     TORCH_CHECK(
         c10::layout_or_default(layout_opt) == c10::Layout::Strided,
-        "empty_memory_format: non-strided layout not supported"
+        "Non strided layout not supported"
     );
     TORCH_CHECK(
         !c10::pinned_memory_or_default(pin_memory_opt),
-        "empty_memory_format: pin_memory not supported on OpenCL"
+        "Pin memory can only be on CPU"
     );
-
-    const auto fmt = memory_format_opt.value_or(c10::MemoryFormat::Contiguous);
-    TORCH_CHECK(
-        fmt == c10::MemoryFormat::Contiguous || fmt == c10::MemoryFormat::Preserve,
-        "empty_memory_format: only Contiguous memory format is supported, got ",
-        fmt
+    const c10::DeviceGuard device_guard(device);
+    constexpr c10::DispatchKeySet pu1_dks(c10::DispatchKey::PrivateUse1);
+    auto allocator = at::GetAllocator(at::kPrivateUse1);
+    return at::detail::empty_generic(
+        size, allocator, pu1_dks, dtype, memory_format_opt
     );
-
-    const auto dtype = c10::dtype_or_default(dtype_opt);
-    const auto device = c10::device_or_default(device_opt);
-    TORCH_CHECK(device.is_privateuseone(), "expected opencl device, got ", device);
-
-    const auto ndim = size.size();
-    std::vector<int64_t> strides(ndim, 1);
-    for (int i = (int)ndim - 2; i >= 0; --i)
-        strides[i] = strides[i + 1] * size[i + 1];
-
-    return make_opencl_tensor(size, strides, dtype, device);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,27 +69,120 @@ at::Tensor empty_strided(
     std::optional<bool> pin_memory_opt
 )
 {
+    const auto device = c10::device_or_default(device_opt);
+    const auto dtype = c10::dtype_or_default(dtype_opt);
+    TORCH_CHECK(device.is_privateuseone());
     TORCH_CHECK(
         c10::layout_or_default(layout_opt) == c10::Layout::Strided,
-        "empty_strided: non-strided layout not supported"
+        "Non strided layout not supported"
     );
     TORCH_CHECK(
         !c10::pinned_memory_or_default(pin_memory_opt),
-        "empty_strided: pin_memory not supported on OpenCL"
+        "Pin memory can only be on CPU"
     );
+    const c10::DeviceGuard device_guard(device);
+    constexpr c10::DispatchKeySet pu1_dks(c10::DispatchKey::PrivateUse1);
+    auto allocator = at::GetAllocator(at::kPrivateUse1);
+    return at::detail::empty_strided_generic(
+        size, stride, allocator, pu1_dks, dtype
+    );
+}
+
+at::Tensor as_strided(
+    const at::Tensor &self,
+    c10::SymIntArrayRef size,
+    c10::SymIntArrayRef stride,
+    std::optional<c10::SymInt> storage_offset
+)
+{
+    auto result = self.alias();
+    auto *impl = result.unsafeGetTensorImpl();
     TORCH_CHECK(
         size.size() == stride.size(),
-        "empty_strided: size and stride must have the same length, got ",
-        size.size(),
-        " vs ",
-        stride.size()
+        "as_strided: size and stride must have same length"
+    );
+    for (const auto &s : stride) {
+        TORCH_CHECK(
+            s >= 0,
+            "as_strided: negative stride not supported in OpenCL backend"
+        );
+    }
+    TORCH_CHECK(
+        storage_offset.has_value(), "as_strided: storage_offset is required"
+    );
+    TORCH_CHECK(
+        storage_offset->expect_int() >= 0, "as_strided: invalid storage_offset"
+    );
+    impl->set_sizes_and_strides(size, stride);
+    impl->set_storage_offset(storage_offset->expect_int());
+    return result;
+}
+
+const at::Tensor &resize_(
+    const at::Tensor &self,
+    c10::SymIntArrayRef size,
+    std::optional<at::MemoryFormat> memory_format
+)
+{
+    auto *impl = self.unsafeGetTensorImpl();
+
+    if (impl->sizes() == C10_AS_INTARRAYREF_SLOW(size)) {
+        return self;
+    }
+
+    auto storage = impl->unsafe_storage();
+    TORCH_CHECK(storage, "resize_: invalid storage");
+
+    auto *storage_impl = storage.unsafeGetStorageImpl();
+    auto itemsize = impl->dtype().itemsize();
+    auto storage_offset = impl->storage_offset();
+
+    auto new_bytes_sym = at::detail::computeStorageNbytesContiguous(
+        C10_AS_INTARRAYREF_SLOW(size), itemsize, storage_offset
     );
 
-    const auto dtype = c10::dtype_or_default(dtype_opt);
-    const auto device = c10::device_or_default(device_opt);
-    TORCH_CHECK(device.is_privateuseone(), "expected opencl device, got ", device);
+    size_t new_bytes = at::detail::computeStorageNbytesContiguous(
+        C10_AS_INTARRAYREF_SLOW(size), itemsize, storage_offset
+    );
 
-    return make_opencl_tensor(size, stride, dtype, device);
+    if (new_bytes > storage_impl->nbytes()) {
+        auto allocator = storage_impl->allocator();
+        TORCH_CHECK(allocator, "resize_: missing allocator");
+
+        at::DataPtr new_data = allocator->allocate(new_bytes);
+
+        std::memcpy(
+            new_data.get(),
+            storage_impl->data(),
+            std::min(storage_impl->nbytes(), new_bytes)
+        );
+
+        storage_impl->set_data_ptr(std::move(new_data));
+        storage_impl->set_nbytes(new_bytes);
+    }
+
+    impl->set_sizes_contiguous(C10_AS_INTARRAYREF_SLOW(size));
+    if (memory_format.has_value()) {
+        impl->empty_tensor_restride(memory_format.value());
+    }
+
+    return self;
+}
+
+at::Tensor _reshape_alias(
+    const at::Tensor &self, c10::SymIntArrayRef size, c10::SymIntArrayRef stride
+)
+{
+    auto result = self.alias();
+    auto *impl = result.unsafeGetTensorImpl();
+    TORCH_CHECK(
+        size.size() == stride.size(), "reshape_alias: size/stride mismatch"
+    );
+    impl->set_sizes_and_strides(
+        C10_AS_INTARRAYREF_SLOW(size), C10_AS_INTARRAYREF_SLOW(stride)
+    );
+
+    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +200,8 @@ at::Tensor empty_strided(
 // pinned-memory allocator is wired up.
 // ---------------------------------------------------------------------------
 
-at::Tensor _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
+at::Tensor
+_copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 {
     TORCH_CHECK(
         self.dtype() == dst.dtype(),
@@ -184,7 +222,8 @@ at::Tensor _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_
 
     const bool src_is_cl = self.device().is_privateuseone();
     const bool dst_is_cl = dst.device().is_privateuseone();
-    const size_t nbytes = static_cast<size_t>(self.numel()) * self.element_size();
+    const size_t nbytes =
+        static_cast<size_t>(self.numel()) * self.element_size();
 
     // ------------------------------------------------------------------
     // (A) CPU → OpenCL
@@ -200,7 +239,9 @@ at::Tensor _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_
             nbytes,
             self.const_data_ptr()
         );
-        TORCH_CHECK(err == CL_SUCCESS, "clEnqueueWriteBuffer failed, code: ", err);
+        TORCH_CHECK(
+            err == CL_SUCCESS, "clEnqueueWriteBuffer failed, code: ", err
+        );
         queue.finish(); // … finish() makes it effectively synchronous
         return dst;
     }
@@ -212,9 +253,12 @@ at::Tensor _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_
         const auto *src_alloc = get_cl_allocation(self);
         cl::CommandQueue &queue = c10::opencl::get_cl_queue(src_alloc->device);
 
-        const cl_int err =
-            queue.enqueueReadBuffer(src_alloc->buffer, CL_FALSE, 0, nbytes, dst.mutable_data_ptr());
-        TORCH_CHECK(err == CL_SUCCESS, "clEnqueueReadBuffer failed, code: ", err);
+        const cl_int err = queue.enqueueReadBuffer(
+            src_alloc->buffer, CL_FALSE, 0, nbytes, dst.mutable_data_ptr()
+        );
+        TORCH_CHECK(
+            err == CL_SUCCESS, "clEnqueueReadBuffer failed, code: ", err
+        );
         queue.finish();
         return dst;
     }
@@ -228,7 +272,9 @@ at::Tensor _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_
 
         TORCH_CHECK(
             src_alloc->device == dst_alloc->device,
-            "_copy_from: peer-to-peer copy between OpenCL devices is not supported yet "
+            "_copy_from: peer-to-peer copy between OpenCL devices is not "
+            "supported "
+            "yet "
             "(src device=",
             src_alloc->device,
             ", dst device=",
@@ -238,9 +284,12 @@ at::Tensor _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_
 
         cl::CommandQueue &queue = c10::opencl::get_cl_queue(src_alloc->device);
 
-        const cl_int err =
-            queue.enqueueCopyBuffer(src_alloc->buffer, dst_alloc->buffer, 0, 0, nbytes);
-        TORCH_CHECK(err == CL_SUCCESS, "clEnqueueCopyBuffer failed, code: ", err);
+        const cl_int err = queue.enqueueCopyBuffer(
+            src_alloc->buffer, dst_alloc->buffer, 0, 0, nbytes
+        );
+        TORCH_CHECK(
+            err == CL_SUCCESS, "clEnqueueCopyBuffer failed, code: ", err
+        );
         queue.finish();
         return dst;
     }

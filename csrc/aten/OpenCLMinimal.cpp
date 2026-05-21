@@ -1,4 +1,3 @@
-#include <ATen/native/CPUFallback.h>
 #include <ATen/native/DispatchStub.h>
 #include <torch/library.h>
 
@@ -19,12 +18,16 @@ at::Tensor wrapper_empty_memory_format(
 )
 {
     return at::native::opencl::empty_memory_format(
-        size, dtype_opt, layout_opt, device_opt, pin_memory_opt, memory_format_opt
+        size,
+        dtype_opt,
+        layout_opt,
+        device_opt,
+        pin_memory_opt,
+        memory_format_opt
     );
 }
 // LITERALINCLUDE END: EMPTY.MEMORY_FORMAT WRAPPER
 
-// LITERALINCLUDE START: EMPTY_STRIDED WRAPPER
 at::Tensor wrapper_empty_strided(
     c10::IntArrayRef size,
     c10::IntArrayRef stride,
@@ -38,15 +41,39 @@ at::Tensor wrapper_empty_strided(
         size, stride, dtype_opt, layout_opt, device_opt, pin_memory_opt
     );
 }
-// LITERALINCLUDE END: EMPTY_STRIDED WRAPPER
 
-// LITERALINCLUDE START: COPY_FROM WRAPPER
-at::Tensor wrapper_copy_from(const at::Tensor &self, const at::Tensor &dst, bool non_blocking)
+at::Tensor wrapper_as_strided(
+    const at::Tensor &self,
+    c10::SymIntArrayRef size,
+    c10::SymIntArrayRef stride,
+    std::optional<c10::SymInt> storage_offset
+)
+{
+    return at::native::opencl::as_strided(self, size, stride, storage_offset);
+}
+
+const at::Tensor &wrapper_resize_(
+    const at::Tensor &self,
+    c10::SymIntArrayRef size,
+    ::std::optional<at::MemoryFormat> memory_format
+)
+{
+    return at::native::opencl::resize_(self, size, memory_format);
+}
+
+at::Tensor wrapper__reshape_alias(
+    const at::Tensor &self, c10::SymIntArrayRef size, c10::SymIntArrayRef stride
+)
+{
+    return at::native::opencl::_reshape_alias(self, size, stride);
+}
+
+at::Tensor wrapper__copy_from(
+    const at::Tensor &self, const at::Tensor &dst, bool non_blocking
+)
 {
     return at::native::opencl::_copy_from(self, dst, non_blocking);
 }
-
-// LITERALINCLUDE END: COPY_FROM WRAPPER
 
 } // namespace
 
@@ -55,7 +82,10 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse1, m)
 {
     m.impl("empty.memory_format", wrapper_empty_memory_format);
     m.impl("empty_strided", wrapper_empty_strided);
-    m.impl("_copy_from", wrapper_copy_from);
+    m.impl("as_strided", wrapper_as_strided);
+    m.impl("resize_", wrapper_resize_);
+    m.impl("_reshape_alias", wrapper__reshape_alias);
+    m.impl("_copy_from", wrapper__copy_from);
 }
 // LITERALINCLUDE END: TORCH_LIBRARY_IMPL DEFAULT
 
