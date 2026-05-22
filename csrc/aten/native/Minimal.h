@@ -39,7 +39,11 @@ at::Tensor _reshape_alias(
     const at::Tensor &self, c10::SymIntArrayRef size, c10::SymIntArrayRef stride
 );
 
+at::Tensor view(const at::Tensor &self, c10::SymIntArrayRef size);
+
 at::Tensor
 _copy_from(const at::Tensor &self, const at::Tensor &dst, bool non_blocking);
+
+at::Scalar _local_scalar_dense(const at::Tensor &self);
 
 } // namespace at::native::opencl

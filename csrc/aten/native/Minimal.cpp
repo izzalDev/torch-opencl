@@ -1,10 +1,12 @@
 #include "aten/native/Minimal.h"
 
-#include <ATen/EmptyTensor.h>
-#include <torch/library.h>
-
 #include "runtime/CLDeviceAllocator.h"
 #include "runtime/CLFunctions.h"
+#include <ATen/Dispatch.h>
+#include <ATen/EmptyTensor.h>
+#include <ATen/InferSize.h>
+#include <ATen/TensorUtils.h>
+#include <torch/library.h>
 
 namespace at::native::opencl {
 
@@ -86,6 +88,38 @@ at::Tensor empty_strided(
     return at::detail::empty_strided_generic(
         size, stride, allocator, pu1_dks, dtype
     );
+}
+
+// ---------------------------------------------------------------------------
+// view
+// Pure metadata operation — shares storage with self.
+// We must NOT call self.view_symint() here because that goes back through
+// the dispatcher into this same kernel (infinite recursion).  Instead we
+// replicate the essential logic: infer sizes, compute contiguous strides,
+// and build an alias with the new metadata.
+// ---------------------------------------------------------------------------
+at::Tensor view(const at::Tensor &self, c10::SymIntArrayRef size)
+{
+    TORCH_CHECK(self.is_contiguous(), "view: input tensor must be contiguous");
+
+    // Infer the true shape (resolves any -1 dimension).
+    auto inferred = at::infer_size_dv(size, self.sym_numel());
+
+    // Compute what the strides must be for a contiguous view of this shape.
+    auto strides_opt = at::detail::computeStride(
+        self.sym_sizes(), self.sym_strides(), inferred
+    );
+    TORCH_CHECK(
+        strides_opt.has_value(),
+        "view size is not compatible with input tensor\'s size and strides "
+        "(at least one dimension spans across two contiguous subspaces). "
+        "Use .reshape(...) instead."
+    );
+
+    // Build an alias (shares storage) with the new size/stride metadata.
+    auto result = self.alias();
+    result.unsafeGetTensorImpl()->set_sizes_and_strides(inferred, *strides_opt);
+    return result;
 }
 
 at::Tensor as_strided(
@@ -272,7 +306,7 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 
         TORCH_CHECK(
             src_alloc->device == dst_alloc->device,
-            "_copy_from: peer-to-peer copy between OpenCL devices is not "
+            "_copy_from: copy between OpenCL devices is not "
             "supported "
             "yet "
             "(src device=",
@@ -301,6 +335,36 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
         self.device(),
         " dst=",
         dst.device()
+    );
+}
+
+at::Scalar _local_scalar_dense(const at::Tensor &self)
+{
+    TORCH_CHECK(
+        self.numel() == 1,
+        "Tensor must have exactly 1 element to be converted to a scalar."
+    );
+
+    const auto *alloc = get_cl_allocation(self);
+    auto &queue = c10::opencl::get_cl_queue(alloc->device);
+
+    return AT_DISPATCH_ALL_TYPES_AND(
+        at::ScalarType::Bool, self.scalar_type(), "_local_scalar_dense", [&] {
+            scalar_t value;
+            auto err = queue.enqueueReadBuffer(
+                alloc->buffer,
+                CL_TRUE, // Blocking read
+                self.storage_offset() * sizeof(scalar_t),
+                sizeof(scalar_t),
+                &value
+            );
+            TORCH_CHECK(
+                err == CL_SUCCESS,
+                "OpenCL enqueueReadBuffer failed with error code: ",
+                err
+            );
+            return at::Scalar(value);
+        }
     );
 }
 

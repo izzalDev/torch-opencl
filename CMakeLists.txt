@@ -40,7 +40,12 @@ target_compile_definitions(${MODULE_NAME} PRIVATE
     CL_TARGET_OPENCL_VERSION=${CL_VERSION}
     CL_HPP_TARGET_OPENCL_VERSION=${CL_VERSION}
 )
-target_include_directories(${MODULE_NAME} PRIVATE csrc)
+
+target_include_directories(${MODULE_NAME} PRIVATE
+    csrc
+    ${TORCH_INCLUDE_DIRS}
+)
+
 target_compile_features(${MODULE_NAME} PRIVATE cxx_std_17)
 
 target_link_libraries(${MODULE_NAME} PRIVATE

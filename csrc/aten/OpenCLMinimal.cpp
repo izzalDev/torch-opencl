@@ -68,6 +68,11 @@ at::Tensor wrapper__reshape_alias(
     return at::native::opencl::_reshape_alias(self, size, stride);
 }
 
+at::Tensor wrapper_view(const at::Tensor &self, c10::SymIntArrayRef size)
+{
+    return at::native::opencl::view(self, size);
+}
+
 at::Tensor wrapper__copy_from(
     const at::Tensor &self, const at::Tensor &dst, bool non_blocking
 )
@@ -75,6 +80,10 @@ at::Tensor wrapper__copy_from(
     return at::native::opencl::_copy_from(self, dst, non_blocking);
 }
 
+at::Scalar wrapper__local_scalar_dense(const at::Tensor &self)
+{
+    return at::native::opencl::_local_scalar_dense(self);
+}
 } // namespace
 
 // LITERALINCLUDE START: TORCH_LIBRARY_IMPL DEFAULT
@@ -85,7 +94,9 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse1, m)
     m.impl("as_strided", wrapper_as_strided);
     m.impl("resize_", wrapper_resize_);
     m.impl("_reshape_alias", wrapper__reshape_alias);
+    m.impl("view", wrapper_view);
     m.impl("_copy_from", wrapper__copy_from);
+    m.impl("_local_scalar_dense", wrapper__local_scalar_dense);
 }
 // LITERALINCLUDE END: TORCH_LIBRARY_IMPL DEFAULT
 
