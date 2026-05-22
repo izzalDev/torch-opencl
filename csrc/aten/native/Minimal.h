@@ -46,4 +46,6 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool non_blocking);
 
 at::Scalar _local_scalar_dense(const at::Tensor &self);
 
+at::Tensor _copy_from_and_resize(const at::Tensor &self, const at::Tensor &dst);
+
 } // namespace at::native::opencl

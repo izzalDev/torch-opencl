@@ -10,24 +10,12 @@
 
 namespace at::native::opencl {
 
-/**
- * Return the CLAllocation handle stored inside a tensor's DataPtr.
- *
- * CLDeviceAllocator::allocate() passes the CLAllocation* as both the
- * ctx and the data pointer of the DataPtr, so .get() gives us the handle
- * directly — not a pointer into the buffer's byte contents.
- */
 static const c10::opencl::CLAllocation *get_cl_allocation(const at::Tensor &t)
 {
     return static_cast<const c10::opencl::CLAllocation *>(
         t.storage().data_ptr().get()
     );
 }
-
-// ---------------------------------------------------------------------------
-// empty.memory_format
-// Strides are computed row-major (contiguous) from size.
-// ---------------------------------------------------------------------------
 
 at::Tensor empty_memory_format(
     c10::IntArrayRef size,
@@ -57,11 +45,6 @@ at::Tensor empty_memory_format(
     );
 }
 
-// ---------------------------------------------------------------------------
-// empty_strided
-// Caller supplies explicit strides — no layout assumption.
-// ---------------------------------------------------------------------------
-
 at::Tensor empty_strided(
     c10::IntArrayRef size,
     c10::IntArrayRef stride,
@@ -90,33 +73,22 @@ at::Tensor empty_strided(
     );
 }
 
-// ---------------------------------------------------------------------------
-// view
-// Pure metadata operation — shares storage with self.
-// We must NOT call self.view_symint() here because that goes back through
-// the dispatcher into this same kernel (infinite recursion).  Instead we
-// replicate the essential logic: infer sizes, compute contiguous strides,
-// and build an alias with the new metadata.
-// ---------------------------------------------------------------------------
 at::Tensor view(const at::Tensor &self, c10::SymIntArrayRef size)
 {
     TORCH_CHECK(self.is_contiguous(), "view: input tensor must be contiguous");
 
-    // Infer the true shape (resolves any -1 dimension).
     auto inferred = at::infer_size_dv(size, self.sym_numel());
 
-    // Compute what the strides must be for a contiguous view of this shape.
     auto strides_opt = at::detail::computeStride(
         self.sym_sizes(), self.sym_strides(), inferred
     );
     TORCH_CHECK(
         strides_opt.has_value(),
-        "view size is not compatible with input tensor\'s size and strides "
+        "view size is not compatible with input tensor's size and strides "
         "(at least one dimension spans across two contiguous subspaces). "
         "Use .reshape(...) instead."
     );
 
-    // Build an alias (shares storage) with the new size/stride metadata.
     auto result = self.alias();
     result.unsafeGetTensorImpl()->set_sizes_and_strides(inferred, *strides_opt);
     return result;
@@ -171,10 +143,6 @@ const at::Tensor &resize_(
     auto itemsize = impl->dtype().itemsize();
     auto storage_offset = impl->storage_offset();
 
-    auto new_bytes_sym = at::detail::computeStorageNbytesContiguous(
-        C10_AS_INTARRAYREF_SLOW(size), itemsize, storage_offset
-    );
-
     size_t new_bytes = at::detail::computeStorageNbytesContiguous(
         C10_AS_INTARRAYREF_SLOW(size), itemsize, storage_offset
     );
@@ -184,12 +152,6 @@ const at::Tensor &resize_(
         TORCH_CHECK(allocator, "resize_: missing allocator");
 
         at::DataPtr new_data = allocator->allocate(new_bytes);
-
-        std::memcpy(
-            new_data.get(),
-            storage_impl->data(),
-            std::min(storage_impl->nbytes(), new_bytes)
-        );
 
         storage_impl->set_data_ptr(std::move(new_data));
         storage_impl->set_nbytes(new_bytes);
@@ -219,21 +181,6 @@ at::Tensor _reshape_alias(
     return result;
 }
 
-// ---------------------------------------------------------------------------
-// _copy_from
-//
-// PyTorch calls this to move data between devices.
-// Contract: self = source, dst = destination. Returns dst.
-//
-//   (A) CPU    → OpenCL  : clEnqueueWriteBuffer
-//   (B) OpenCL → CPU     : clEnqueueReadBuffer
-//   (C) OpenCL → OpenCL  : clEnqueueCopyBuffer  (same device only)
-//
-// Peer-to-peer (different OpenCL devices) is rejected for now.
-// non_blocking is accepted but ignored — always synchronous until a
-// pinned-memory allocator is wired up.
-// ---------------------------------------------------------------------------
-
 at::Tensor
 _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 {
@@ -259,36 +206,44 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
     const size_t nbytes =
         static_cast<size_t>(self.numel()) * self.element_size();
 
-    // ------------------------------------------------------------------
-    // (A) CPU → OpenCL
-    // ------------------------------------------------------------------
+    if (nbytes == 0) {
+        return dst;
+    }
+
+    // CPU → OpenCL
     if (!src_is_cl && dst_is_cl) {
         const auto *dst_alloc = get_cl_allocation(dst);
         cl::CommandQueue &queue = c10::opencl::get_cl_queue(dst_alloc->device);
 
+        const size_t dst_offset = dst.storage_offset() * dst.element_size();
+
         const cl_int err = queue.enqueueWriteBuffer(
             dst_alloc->buffer,
-            CL_FALSE, // non-blocking enqueue …
-            0,
+            CL_FALSE,
+            dst_offset,
             nbytes,
             self.const_data_ptr()
         );
         TORCH_CHECK(
             err == CL_SUCCESS, "clEnqueueWriteBuffer failed, code: ", err
         );
-        queue.finish(); // … finish() makes it effectively synchronous
+        queue.finish();
         return dst;
     }
 
-    // ------------------------------------------------------------------
-    // (B) OpenCL → CPU
-    // ------------------------------------------------------------------
+    // OpenCL → CPU
     if (src_is_cl && !dst_is_cl) {
         const auto *src_alloc = get_cl_allocation(self);
         cl::CommandQueue &queue = c10::opencl::get_cl_queue(src_alloc->device);
 
+        const size_t src_offset = self.storage_offset() * self.element_size();
+
         const cl_int err = queue.enqueueReadBuffer(
-            src_alloc->buffer, CL_FALSE, 0, nbytes, dst.mutable_data_ptr()
+            src_alloc->buffer,
+            CL_FALSE,
+            src_offset,
+            nbytes,
+            dst.mutable_data_ptr()
         );
         TORCH_CHECK(
             err == CL_SUCCESS, "clEnqueueReadBuffer failed, code: ", err
@@ -297,18 +252,14 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
         return dst;
     }
 
-    // ------------------------------------------------------------------
-    // (C) OpenCL → OpenCL
-    // ------------------------------------------------------------------
+    // OpenCL → OpenCL
     if (src_is_cl && dst_is_cl) {
         const auto *src_alloc = get_cl_allocation(self);
         const auto *dst_alloc = get_cl_allocation(dst);
 
         TORCH_CHECK(
             src_alloc->device == dst_alloc->device,
-            "_copy_from: copy between OpenCL devices is not "
-            "supported "
-            "yet "
+            "_copy_from: copy between OpenCL devices is not supported yet "
             "(src device=",
             src_alloc->device,
             ", dst device=",
@@ -318,8 +269,11 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 
         cl::CommandQueue &queue = c10::opencl::get_cl_queue(src_alloc->device);
 
+        const size_t src_offset = self.storage_offset() * self.element_size();
+        const size_t dst_offset = dst.storage_offset() * dst.element_size();
+
         const cl_int err = queue.enqueueCopyBuffer(
-            src_alloc->buffer, dst_alloc->buffer, 0, 0, nbytes
+            src_alloc->buffer, dst_alloc->buffer, src_offset, dst_offset, nbytes
         );
         TORCH_CHECK(
             err == CL_SUCCESS, "clEnqueueCopyBuffer failed, code: ", err
@@ -328,7 +282,6 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
         return dst;
     }
 
-    // CPU → CPU should never reach here (handled by ATen)
     TORCH_CHECK(
         false,
         "_copy_from: unexpected device combination: src=",
@@ -336,6 +289,14 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
         " dst=",
         dst.device()
     );
+}
+
+at::Tensor _copy_from_and_resize(const at::Tensor &self, const at::Tensor &dst)
+{
+    if (dst.sizes() != self.sizes()) {
+        resize_(dst, self.sym_sizes(), c10::nullopt);
+    }
+    return _copy_from(self, dst, false);
 }
 
 at::Scalar _local_scalar_dense(const at::Tensor &self)
@@ -353,7 +314,7 @@ at::Scalar _local_scalar_dense(const at::Tensor &self)
             scalar_t value;
             auto err = queue.enqueueReadBuffer(
                 alloc->buffer,
-                CL_TRUE, // Blocking read
+                CL_TRUE,
                 self.storage_offset() * sizeof(scalar_t),
                 sizeof(scalar_t),
                 &value
