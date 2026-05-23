@@ -21,6 +21,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install PoCL
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pocl-opencl-icd clinfo
+          clinfo -l
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

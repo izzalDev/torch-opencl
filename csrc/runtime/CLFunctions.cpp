@@ -44,7 +44,7 @@ static void init_opencl_runtime()
     for (auto &platform : platforms) {
         std::vector<cl::Device> platform_devs;
         try {
-            platform.getDevices(CL_DEVICE_TYPE_GPU, &platform_devs);
+            platform.getDevices(CL_DEVICE_TYPE_ALL, &platform_devs);
         } catch (const cl::Error &) {
             continue;
         }
@@ -76,7 +76,10 @@ void ensure_initialized()
     c10::call_once(g_init_flag, init_opencl_runtime);
 }
 
-bool is_in_bad_fork() { return g_original_pid != -1 && getpid() != g_original_pid; }
+bool is_in_bad_fork()
+{
+    return g_original_pid != -1 && getpid() != g_original_pid;
+}
 
 DeviceIndex device_count() noexcept
 {

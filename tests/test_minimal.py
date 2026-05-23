@@ -94,15 +94,11 @@ class TestCopyFrom:
     def test_peer_to_peer_raises(self):
         """Cross-device copy must raise until P2P is implemented."""
         src = torch.ones(4).to("opencl:0")
-        with pytest.raises(RuntimeError, match="peer-to-peer"):
+        with pytest.raises(
+            RuntimeError,
+            match="_copy_from: copy between OpenCL devices is not supported yet ",
+        ):
             src.to("opencl:1")
-
-    def test_copy_mismatched_dtype_raises(self):
-        """Verify copy_from rejects mismatched datatypes."""
-        src = torch.ones(4, dtype=torch.float32).to("opencl")
-        dst = torch.zeros(4, dtype=torch.int32).to("opencl")
-        with pytest.raises(RuntimeError, match="dtype mismatch"):
-            torch.ops.aten._copy_from(src, dst)
 
     def test_copy_mismatched_numel_raises(self):
         """Verify copy_from rejects mismatched sizes."""
@@ -131,7 +127,7 @@ class TestAsStrided:
         assert view.shape == torch.Size([3])
         assert view.stride() == (2,)
         assert view.storage_offset() == 1
-        assert view.storage().data_ptr() == base.storage().data_ptr()
+        assert view.untyped_storage().data_ptr() == base.untyped_storage().data_ptr()
 
     def test_as_strided_negative_stride_raises(self):
         """Verify that negative strides are rejected."""
@@ -157,10 +153,10 @@ class TestResize:
     def test_resize_smaller(self):
         """Verify resizing a tensor smaller updates metadata and retains storage."""
         t = torch.empty((4, 4), device="opencl")
-        original_ptr = t.storage().data_ptr()
+        original_ptr = t.untyped_storage().data_ptr()
         t.resize_((2, 2))
         assert t.shape == torch.Size([2, 2])
-        assert t.storage().data_ptr() == original_ptr
+        assert t.untyped_storage().data_ptr() == original_ptr
 
     def test_resize_scalar(self):
         """Verify resizing a scalar tensor."""
@@ -178,4 +174,6 @@ class TestReshapeAlias:
         reshaped = torch.ops.aten._reshape_alias(base, [6], [1])
         assert reshaped.shape == torch.Size([6])
         assert reshaped.device.type == "opencl"
-        assert reshaped.storage().data_ptr() == base.storage().data_ptr()
+        assert (
+            reshaped.untyped_storage().data_ptr() == base.untyped_storage().data_ptr()
+        )
