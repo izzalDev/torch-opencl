@@ -31,6 +31,7 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse1, m)
 
     // Fill.h
     m.impl("zero_", at::native::opencl::zero_);
+    m.impl("fill_.Scalar", at::native::opencl::fill_);
 
     // CPU fallback for display/diagnostic ops, not worth a dedicated kernel.
     for (const auto *op :
@@ -49,7 +50,10 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse1, m)
           "mul.out",
           "div.out",
           "add.out",
-          "sub.out"}) {
+          "sub.out",
+          "min",
+          "max",
+          "gt.Scalar_out"}) {
         m.impl(op, torch::CppFunction::makeFromBoxedFunction<&cpu_fallback>());
     }
 }

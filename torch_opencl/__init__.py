@@ -20,6 +20,7 @@ def _autoload():
     _rename("opencl")
     _torch._register_device_module("opencl", opencl)
     _generate(for_storage=True)
+    _torch.set_printoptions(sci_mode=False)
 
 
 __all__ = [

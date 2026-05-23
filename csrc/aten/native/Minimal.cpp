@@ -185,13 +185,6 @@ at::Tensor
 _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 {
     TORCH_CHECK(
-        self.dtype() == dst.dtype(),
-        "_copy_from: dtype mismatch: src=",
-        self.dtype(),
-        " dst=",
-        dst.dtype()
-    );
-    TORCH_CHECK(
         self.numel() == dst.numel(),
         "_copy_from: numel mismatch: src=",
         self.numel(),
