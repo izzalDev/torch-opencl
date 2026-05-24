@@ -14,42 +14,49 @@ namespace c10::opencl {
 
 namespace {
 
-struct DeviceStatsTracker {
-    int64_t current_allocated{0};
-    int64_t peak_allocated{0};
-    int64_t num_allocs{0};
-    int64_t num_frees{0};
-    int64_t num_ooms{0};
-};
+static std::vector<c10::CachingDeviceAllocator::DeviceStats> g_all_stats;
+static std::once_flag g_stats_init_flag;
 
-/**
- * Provides access to the per-device statistics tracker.
- * Uses lazy initialization to match the actual OpenCL device count.
- */
-DeviceStatsTracker &get_tracker(int64_t device_index)
+void ensure_stats_initialized()
 {
-    static std::vector<DeviceStatsTracker> trackers;
-    static std::once_flag init_flag;
-
-    std::call_once(init_flag, []() {
+    std::call_once(g_stats_init_flag, []() {
         int count = device_count();
-        trackers.resize(count > 0 ? count : 1);
+        g_all_stats.resize(count > 0 ? count : 1);
     });
-
-    return trackers.at(device_index);
 }
 
-/**
- * Deleter function for DataPtr.
- * Decrements allocation tracking as memory is returned to the driver.
- */
+c10::CachingDeviceAllocator::DeviceStats &get_stats(int64_t device_index)
+{
+    ensure_stats_initialized();
+    return g_all_stats[device_index];
+}
+
+void track_allocation(int64_t device_index, size_t nbytes)
+{
+    auto &stats = get_stats(device_index);
+    stats.num_device_alloc++;
+    stats.allocated_bytes[0].current += nbytes;
+    stats.reserved_bytes[0].current += nbytes;
+
+    if (stats.allocated_bytes[0].current > stats.allocated_bytes[0].peak) {
+        stats.allocated_bytes[0].peak = stats.allocated_bytes[0].current;
+        stats.reserved_bytes[0].peak = stats.allocated_bytes[0].current;
+    }
+}
+
+void track_deallocation(int64_t device_index, size_t nbytes)
+{
+    auto &stats = get_stats(device_index);
+    stats.allocated_bytes[0].current -= nbytes;
+    stats.reserved_bytes[0].current -= nbytes;
+    stats.num_device_free++;
+}
+
 void deleteHandle(void *ptr)
 {
     auto *alloc = static_cast<CLAllocation *>(ptr);
     if (alloc) {
-        auto &tracker = get_tracker(alloc->device);
-        tracker.current_allocated -= alloc->size;
-        tracker.num_frees++;
+        track_deallocation(alloc->device, alloc->size);
         delete alloc;
     }
 }
@@ -62,26 +69,30 @@ at::DataPtr CLDeviceAllocator::allocate(size_t nbytes)
     const auto device_index = guard.getDevice().index();
 
     TORCH_CHECK(
-        device_index >= 0 && device_index < static_cast<int64_t>(device_count()),
+        device_index >= 0 &&
+            device_index < static_cast<int64_t>(device_count()),
         "allocate(): invalid device_index: ",
         device_index
     );
 
-    auto &tracker = get_tracker(device_index);
-
     if (nbytes == 0) {
-        auto handle = std::make_unique<CLAllocation>(cl::Buffer{}, device_index, 0);
+        auto handle =
+            std::make_unique<CLAllocation>(cl::Buffer{}, device_index, 0);
         auto *raw = handle.release();
-        return {raw, raw, &deleteHandle, at::Device(at::kPrivateUse1, device_index)};
+        return {
+            raw, raw, &deleteHandle, at::Device(at::kPrivateUse1, device_index)
+        };
     }
 
-    cl::Context &context = get_cl_context(device_index);
+    const auto &context = get_cl_context(device_index);
 
     cl_int err = CL_SUCCESS;
     cl::Buffer buffer(context, CL_MEM_READ_WRITE, nbytes, nullptr, &err);
 
-    if (err == CL_MEM_OBJECT_ALLOCATION_FAILURE)
-        tracker.num_ooms++;
+    if (err == CL_MEM_OBJECT_ALLOCATION_FAILURE) {
+        auto &stats = get_stats(device_index);
+        stats.num_ooms++;
+    }
 
     TORCH_CHECK(
         err == CL_SUCCESS,
@@ -90,31 +101,38 @@ at::DataPtr CLDeviceAllocator::allocate(size_t nbytes)
         ". Potential Out of Memory (OOM) on GPU."
     );
 
-    tracker.num_allocs++;
-    tracker.current_allocated += nbytes;
+    track_allocation(device_index, nbytes);
 
-    if (tracker.current_allocated > tracker.peak_allocated)
-        tracker.peak_allocated = tracker.current_allocated;
-
-    auto handle = std::make_unique<CLAllocation>(std::move(buffer), device_index, nbytes);
+    auto handle =
+        std::make_unique<CLAllocation>(std::move(buffer), device_index, nbytes);
     auto *raw = handle.release();
 
-    return {raw, raw, &deleteHandle, at::Device(at::kPrivateUse1, device_index)};
+    return {
+        raw, raw, &deleteHandle, at::Device(at::kPrivateUse1, device_index)
+    };
 }
 
-at::DeleterFnPtr CLDeviceAllocator::raw_deleter() const { return &deleteHandle; }
+at::DeleterFnPtr CLDeviceAllocator::raw_deleter() const
+{
+    return &deleteHandle;
+}
 
-void CLDeviceAllocator::copy_data(void *dest, const void *src, std::size_t count) const
+void CLDeviceAllocator::copy_data(
+    void *dest, const void *src, std::size_t count
+) const
 {
     const auto *src_handle = static_cast<const CLAllocation *>(src);
     auto *dest_handle = static_cast<CLAllocation *>(dest);
 
     TORCH_CHECK(
-        src_handle->device == dest_handle->device, "copy_data: peer-to-peer copy not supported"
+        src_handle->device == dest_handle->device,
+        "copy_data: peer-to-peer copy not supported"
     );
 
-    cl::CommandQueue &queue = get_cl_queue(src_handle->device);
-    cl_int err = queue.enqueueCopyBuffer(src_handle->buffer, dest_handle->buffer, 0, 0, count);
+    const auto &queue = get_cl_queue(src_handle->device);
+    cl_int err = queue.enqueueCopyBuffer(
+        src_handle->buffer, dest_handle->buffer, 0, 0, count
+    );
     TORCH_CHECK(err == CL_SUCCESS, "clEnqueueCopyBuffer failed");
 
     queue.finish();
@@ -135,35 +153,21 @@ void CLDeviceAllocator::recordStream(const at::DataPtr &, c10::Stream)
 c10::CachingDeviceAllocator::DeviceStats
 CLDeviceAllocator::getDeviceStats(c10::DeviceIndex device_index)
 {
-    c10::CachingDeviceAllocator::DeviceStats stats;
-    auto &tracker = get_tracker(device_index);
-
-    int64_t current_val = tracker.current_allocated;
-    int64_t peak_val = tracker.peak_allocated;
-
-    stats.allocated_bytes[0].current = current_val;
-    stats.allocated_bytes[0].peak = peak_val;
-    stats.num_device_alloc = tracker.num_allocs;
-    stats.num_device_free = tracker.num_frees;
-
-    stats.reserved_bytes[0].current = current_val;
-    stats.reserved_bytes[0].peak = peak_val;
-    stats.num_ooms = tracker.num_ooms;
-
-    return stats;
+    return get_stats(device_index);
 }
 
 void CLDeviceAllocator::resetAccumulatedStats(c10::DeviceIndex device_index)
 {
-    auto &tracker = get_tracker(device_index);
-    tracker.num_allocs = 0;
-    tracker.num_frees = 0;
+    auto &stats = get_stats(device_index);
+    stats.num_device_alloc = 0;
+    stats.num_device_free = 0;
 }
 
 void CLDeviceAllocator::resetPeakStats(c10::DeviceIndex device_index)
 {
-    auto &tracker = get_tracker(device_index);
-    tracker.peak_allocated = tracker.current_allocated;
+    auto &stats = get_stats(device_index);
+    stats.allocated_bytes[0].peak = stats.allocated_bytes[0].current;
+    stats.reserved_bytes[0].peak = stats.allocated_bytes[0].current;
 }
 
 } // namespace c10::opencl

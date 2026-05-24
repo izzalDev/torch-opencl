@@ -1,30 +1,28 @@
 #pragma once
 
+#include "runtime/CLDeviceAllocator.h"
 #include <c10/core/Device.h>
 #include <c10/util/Exception.h>
 
-#include <CL/opencl.hpp>
-
 namespace c10::opencl {
 
-DeviceIndex device_count() noexcept;
-bool is_in_bad_fork();
 void ensure_initialized();
+bool is_in_bad_fork();
+DeviceIndex device_count() noexcept;
 
-cl::Context &get_cl_context(DeviceIndex device);
-cl::Device &get_cl_device(DeviceIndex device);
-cl::CommandQueue &get_cl_queue(DeviceIndex device);
+const cl::Context &get_cl_context(DeviceIndex device);
+const cl::Device &get_cl_device(DeviceIndex device);
+const cl::CommandQueue &get_cl_queue(DeviceIndex device);
+const CLAllocation &get_alloc(const at::Tensor &tensor);
 
 inline void check_device_index(DeviceIndex device)
 {
-    auto count = device_count();
     TORCH_CHECK(
-        device >= 0 && device < count,
+        device >= 0 && device < device_count(),
         "Invalid OpenCL device index: ",
         device,
-        " (total devices: ",
-        count,
-        ")"
+        ", available devices: ",
+        device_count()
     );
 }
 

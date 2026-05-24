@@ -1,6 +1,5 @@
 #include "aten/native/Minimal.h"
 
-#include "runtime/CLDeviceAllocator.h"
 #include "runtime/CLFunctions.h"
 #include <ATen/Dispatch.h>
 #include <ATen/EmptyTensor.h>
@@ -9,13 +8,6 @@
 #include <torch/library.h>
 
 namespace at::native::opencl {
-
-static const c10::opencl::CLAllocation *get_cl_allocation(const at::Tensor &t)
-{
-    return static_cast<const c10::opencl::CLAllocation *>(
-        t.storage().data_ptr().get()
-    );
-}
 
 at::Tensor empty_memory_format(
     c10::IntArrayRef size,
@@ -205,13 +197,13 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 
     // CPU → OpenCL
     if (!src_is_cl && dst_is_cl) {
-        const auto *dst_alloc = get_cl_allocation(dst);
-        cl::CommandQueue &queue = c10::opencl::get_cl_queue(dst_alloc->device);
+        const auto &dst_alloc = c10::opencl::get_alloc(dst);
+        const auto &queue = c10::opencl::get_cl_queue(dst_alloc.device);
 
         const size_t dst_offset = dst.storage_offset() * dst.element_size();
 
         const cl_int err = queue.enqueueWriteBuffer(
-            dst_alloc->buffer,
+            dst_alloc.buffer,
             CL_FALSE,
             dst_offset,
             nbytes,
@@ -226,13 +218,13 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 
     // OpenCL → CPU
     if (src_is_cl && !dst_is_cl) {
-        const auto *src_alloc = get_cl_allocation(self);
-        cl::CommandQueue &queue = c10::opencl::get_cl_queue(src_alloc->device);
+        const auto &src_alloc = c10::opencl::get_alloc(self);
+        const auto &queue = c10::opencl::get_cl_queue(src_alloc.device);
 
         const size_t src_offset = self.storage_offset() * self.element_size();
 
         const cl_int err = queue.enqueueReadBuffer(
-            src_alloc->buffer,
+            src_alloc.buffer,
             CL_FALSE,
             src_offset,
             nbytes,
@@ -247,26 +239,26 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
 
     // OpenCL → OpenCL
     if (src_is_cl && dst_is_cl) {
-        const auto *src_alloc = get_cl_allocation(self);
-        const auto *dst_alloc = get_cl_allocation(dst);
+        const auto &src_alloc = c10::opencl::get_alloc(self);
+        const auto &dst_alloc = c10::opencl::get_alloc(dst);
 
         TORCH_CHECK(
-            src_alloc->device == dst_alloc->device,
+            src_alloc.device == dst_alloc.device,
             "_copy_from: copy between OpenCL devices is not supported yet "
             "(src device=",
-            src_alloc->device,
+            src_alloc.device,
             ", dst device=",
-            dst_alloc->device,
+            dst_alloc.device,
             ")"
         );
 
-        cl::CommandQueue &queue = c10::opencl::get_cl_queue(src_alloc->device);
+        const auto &queue = c10::opencl::get_cl_queue(src_alloc.device);
 
         const size_t src_offset = self.storage_offset() * self.element_size();
         const size_t dst_offset = dst.storage_offset() * dst.element_size();
 
         const cl_int err = queue.enqueueCopyBuffer(
-            src_alloc->buffer, dst_alloc->buffer, src_offset, dst_offset, nbytes
+            src_alloc.buffer, dst_alloc.buffer, src_offset, dst_offset, nbytes
         );
         TORCH_CHECK(
             err == CL_SUCCESS, "clEnqueueCopyBuffer failed, code: ", err
@@ -299,14 +291,14 @@ at::Scalar _local_scalar_dense(const at::Tensor &self)
         "Tensor must have exactly 1 element to be converted to a scalar."
     );
 
-    const auto *alloc = get_cl_allocation(self);
-    auto &queue = c10::opencl::get_cl_queue(alloc->device);
+    const auto &alloc = c10::opencl::get_alloc(self);
+    const auto &queue = c10::opencl::get_cl_queue(alloc.device);
 
     return AT_DISPATCH_ALL_TYPES_AND(
         at::ScalarType::Bool, self.scalar_type(), "_local_scalar_dense", [&] {
             scalar_t value;
-            auto err = queue.enqueueReadBuffer(
-                alloc->buffer,
+            cl_int err = queue.enqueueReadBuffer(
+                alloc.buffer,
                 CL_TRUE,
                 self.storage_offset() * sizeof(scalar_t),
                 sizeof(scalar_t),

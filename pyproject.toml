@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 authors = [{ name = "izzalDev", email = "rizal.fadlullah@gmail.com" }]
 dynamic = ["version"]
 
-dependencies = ["nanobind", "numpy<2.4", "torch>=2.6"]
+dependencies = ["torch>=2.6"]
 
 [project.entry-points."torch.backends"]
 opencl = "torch_opencl:_autoload"
