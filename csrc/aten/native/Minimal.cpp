@@ -2,6 +2,7 @@
 
 #include "runtime/CLDeviceAllocator.h"
 #include "runtime/CLFunctions.h"
+#include <ATen/ATen.h>
 #include <ATen/Dispatch.h>
 #include <ATen/EmptyTensor.h>
 #include <ATen/InferSize.h>
@@ -113,14 +114,12 @@ at::Tensor as_strided(
             "as_strided: negative stride not supported in OpenCL backend"
         );
     }
+    int64_t offset = storage_offset.has_value() ? storage_offset->expect_int() : self.storage_offset();
     TORCH_CHECK(
-        storage_offset.has_value(), "as_strided: storage_offset is required"
-    );
-    TORCH_CHECK(
-        storage_offset->expect_int() >= 0, "as_strided: invalid storage_offset"
+        offset >= 0, "as_strided: invalid storage_offset"
     );
     impl->set_sizes_and_strides(size, stride);
-    impl->set_storage_offset(storage_offset->expect_int());
+    impl->set_storage_offset(offset);
     return result;
 }
 
@@ -191,6 +190,44 @@ _copy_from(const at::Tensor &self, const at::Tensor &dst, bool /*non_blocking*/)
         " dst=",
         dst.numel()
     );
+
+    // Fallback for non-contiguous copies
+    if (!self.is_contiguous() || !dst.is_contiguous()) {
+        const bool src_is_cl = self.device().is_privateuseone();
+        const bool dst_is_cl = dst.device().is_privateuseone();
+
+        // 1. OpenCL -> CPU
+        if (src_is_cl && !dst_is_cl) {
+            int64_t self_storage_numel = static_cast<int64_t>(self.storage().nbytes() / self.element_size());
+            auto self_flat = at::as_strided(self, {self_storage_numel}, {1}, 0);
+            auto self_storage_cpu = at::empty({self_storage_numel}, self.options().device(at::kCPU));
+            at::native::opencl::_copy_from(self_flat, self_storage_cpu, false);
+            auto self_cpu = at::as_strided(self_storage_cpu, self.sizes(), self.strides(), self.storage_offset());
+            dst.copy_(self_cpu);
+            return dst;
+        }
+
+        // 2. CPU -> OpenCL
+        if (!src_is_cl && dst_is_cl) {
+            int64_t dst_storage_numel = static_cast<int64_t>(dst.storage().nbytes() / dst.element_size());
+            auto dst_flat = at::as_strided(dst, {dst_storage_numel}, {1}, 0);
+            auto dst_storage_cpu = at::empty({dst_storage_numel}, dst.options().device(at::kCPU));
+            at::native::opencl::_copy_from(dst_flat, dst_storage_cpu, false);
+            auto dst_cpu = at::as_strided(dst_storage_cpu, dst.sizes(), dst.strides(), dst.storage_offset());
+            dst_cpu.copy_(self);
+            at::native::opencl::_copy_from(dst_storage_cpu, dst_flat, false);
+            return dst;
+        }
+
+        // 3. OpenCL -> OpenCL
+        if (src_is_cl && dst_is_cl) {
+            auto temp_cpu = at::empty(self.sizes(), self.options().device(at::kCPU));
+            at::native::opencl::_copy_from(self, temp_cpu, false);
+            at::native::opencl::_copy_from(temp_cpu, dst, false);
+            return dst;
+        }
+    }
+
     TORCH_CHECK(self.is_contiguous(), "_copy_from: src must be contiguous");
     TORCH_CHECK(dst.is_contiguous(), "_copy_from: dst must be contiguous");
 
@@ -289,7 +326,7 @@ at::Tensor _copy_from_and_resize(const at::Tensor &self, const at::Tensor &dst)
     if (dst.sizes() != self.sizes()) {
         resize_(dst, self.sym_sizes(), c10::nullopt);
     }
-    return _copy_from(self, dst, false);
+    return at::native::opencl::_copy_from(self, dst, false);
 }
 
 at::Scalar _local_scalar_dense(const at::Tensor &self)

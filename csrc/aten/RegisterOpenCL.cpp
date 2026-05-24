@@ -2,6 +2,7 @@
 #include <ATen/native/DispatchStub.h>
 #include <torch/library.h>
 
+#include "native/BinaryOps.h"
 #include "native/Fill.h"
 #include "native/Minimal.h"
 
@@ -32,6 +33,9 @@ TORCH_LIBRARY_IMPL(aten, PrivateUse1, m)
     // Fill.h
     m.impl("zero_", at::native::opencl::zero_);
     m.impl("fill_.Scalar", at::native::opencl::fill_);
+
+    // BinaryOps.h
+    m.impl("add_.Tensor", at::native::opencl::add_);
 
     // CPU fallback for display/diagnostic ops, not worth a dedicated kernel.
     for (const auto *op :

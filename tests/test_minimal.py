@@ -107,14 +107,14 @@ class TestCopyFrom:
         with pytest.raises(RuntimeError, match="numel mismatch"):
             torch.ops.aten._copy_from(src, dst)
 
-    def test_copy_non_contiguous_raises(self):
-        """Verify copy_from rejects non-contiguous tensors."""
-        src = torch.empty_strided((2, 2), (1, 2), device="opencl")
+    def test_copy_non_contiguous_works(self):
+        """Verify copy_from successfully copies non-contiguous tensors."""
+        src_cpu = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+        src = src_cpu.t().to("opencl")
         dst = torch.empty((2, 2), device="opencl")
-        # Column-major tensor is non-contiguous
         assert not src.is_contiguous()
-        with pytest.raises(RuntimeError, match="src must be contiguous"):
-            torch.ops.aten._copy_from(src, dst)
+        torch.ops.aten._copy_from(src, dst)
+        assert torch.allclose(dst.cpu(), src_cpu.t())
 
 
 @pytest.mark.usefixtures("has_device")
