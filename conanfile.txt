@@ -2,6 +2,7 @@
 opencl-clhpp-headers/2025.07.22
 opencl-headers/2025.07.22
 opencl-icd-loader/2025.07.22
+clblast/1.7.0
 
 [generators]
 CMakeDeps
