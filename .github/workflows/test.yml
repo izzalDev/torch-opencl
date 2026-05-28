@@ -1,68 +1,68 @@
-name: Test
+name: CI Run Test
 on:
   workflow_dispatch:
   push:
     branches: [main]
   pull_request:
-
 jobs:
   test:
     name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      checks: write
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.14"]
-
+        include:
+          - os: ubuntu-latest
+            python-version: "3.14"
+          - os: windows-latest
+            python-version: "3.10"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Set up OpenCL
-        if: runner.os == 'Linux' || runner.os == 'Windows'
         uses: izzalDev/setup-opencl@v1
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: false
-
-      - name: Get uv cache dir
-        id: uv-cache
-        shell: bash
-        run: |
-          UV_DIR=$(uv cache dir)
-          echo "dir=$UV_DIR" >> $GITHUB_OUTPUT
-
-      - name: Cache uv dependencies
-        uses: actions/cache@v4
+          python-version: ${{ matrix.python-version }}
+      - name: Restore cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
-          path: ${{ steps.uv-cache.outputs.dir }}
-          key: uv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv
+            ~/work/_temp/setup-uv-cache
+            .venv
+            build
+          key: cache-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('uv.lock', 'CMakeLists.txt', 'pyproject.toml') }}-${{ hashFiles('src/**/*') }}
           restore-keys: |
-            uv-${{ runner.os }}-${{ matrix.python-version }}-
-
-      - name: Cache build directory
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: build-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('src/**/*.{cpp,h,hpp}', 'CMakeLists.txt', 'pyproject.toml') }}
-          restore-keys: |
-            build-${{ runner.os }}-${{ matrix.python-version }}-
-
-      - name: Install dependencies
-        run: uv sync --all-extras --dev --no-install-workspace
-
-      - name: Build and Install torch-opencl
-        run: uv pip install -e . -v
-
+            cache-${{ runner.os }}-${{ matrix.python-version }}-
       - name: Run tests
-        run: uv run pytest -v
+        run: uv run pytest -v --ignore=apt-cache --junitxml=test-results/results.xml
+      - name: Publish test results
+        uses: mikepenz/action-junit-report@v6
+        if: always()
+        with:
+          report_paths: test-results/results.xml
+          check_name: "Test (${{ matrix.os }}, Python ${{ matrix.python-version }})"
+          include_passed: true
+          detailed_summary: true
+          annotate_only: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+      - name: Save cache
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv
+            ~/work/_temp/setup-uv-cache
+            .venv
+            build
+          key: cache-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('uv.lock', 'CMakeLists.txt', 'pyproject.toml') }}-${{ hashFiles('src/**/*') }}

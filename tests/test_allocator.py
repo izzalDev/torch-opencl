@@ -3,14 +3,13 @@ import torch
 
 
 @pytest.mark.usefixtures("has_device")
-def test_opencl_empty():
+def test_allocator():
+    # test_opencl_empty
     x = torch.empty(4, device="opencl")
     assert x.device.type == "opencl"
     assert x.numel() == 4
 
-
-@pytest.mark.usefixtures("has_device")
-def test_zero_size_allocation():
+    # test_zero_size_allocation
     # Allocating an empty tensor with shape containing zero
     x = torch.empty(0, device="opencl")
     assert x.device.type == "opencl"
@@ -22,9 +21,7 @@ def test_zero_size_allocation():
     assert y.numel() == 0
     assert y.shape == torch.Size([2, 0, 3])
 
-
-@pytest.mark.usefixtures("has_device")
-def test_allocator_dtypes():
+    # test_allocator_dtypes
     dtypes = [
         torch.float32,
         torch.float64,
@@ -41,14 +38,10 @@ def test_allocator_dtypes():
         assert x.dtype == dtype
         assert x.shape == torch.Size([2, 5])
 
-
-@pytest.mark.usefixtures("has_device")
-def test_pin_memory_raises():
+    # test_pin_memory_raises
     with pytest.raises(RuntimeError, match="Pin memory can only be on CPU"):
         torch.empty(5, pin_memory=True, device="opencl")
 
-
-@pytest.mark.usefixtures("has_device")
-def test_unsupported_layout_raises():
+    # test_unsupported_layout_raises
     with pytest.raises(Exception):
         torch.empty(5, layout=torch.sparse_coo, device="opencl")
